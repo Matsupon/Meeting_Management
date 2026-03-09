@@ -1,0 +1,67 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Event;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+
+class EventController extends Controller
+{
+    /**
+     * GET /api/events — return all events
+     */
+    public function index()
+    {
+        $events = Event::orderBy('date')->orderBy('time')->get();
+        return response()->json(['status' => 'success', 'data' => $events]);
+    }
+
+    /**
+     * POST /api/events — create or update an event
+     */
+    public function store(Request $request)
+    {
+        $input = $request->json()->all();
+        $id = $input['id'] ?? null;
+
+        if (!empty($id)) {
+            // Update
+            $event = Event::find($id);
+            if (!$event) {
+                return response()->json(['status' => 'error', 'message' => 'Event not found'], 404);
+            }
+            $event->title       = $input['title']       ?? $event->title;
+            $event->date        = $input['date']        ?? $event->date;
+            $event->time        = $input['time']        ?? $event->time;
+            $event->description = $input['description'] ?? $event->description;
+            $event->status      = $input['status']      ?? $event->status;
+            $event->save();
+        } else {
+            // Create
+            Event::create([
+                'id'          => (string) Str::uuid(),
+                'title'       => $input['title']       ?? '',
+                'date'        => $input['date']        ?? '',
+                'time'        => $input['time']        ?? '',
+                'description' => $input['description'] ?? '',
+                'status'      => $input['status']      ?? 'upcoming',
+            ]);
+        }
+
+        return response()->json(['status' => 'success']);
+    }
+
+    /**
+     * DELETE /api/events/{id} — delete an event
+     */
+    public function destroy($id)
+    {
+        $event = Event::find($id);
+        if (!$event) {
+            return response()->json(['status' => 'error', 'message' => 'Event not found'], 404);
+        }
+        $event->delete();
+        return response()->json(['status' => 'success']);
+    }
+}
