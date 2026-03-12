@@ -164,7 +164,7 @@
         display: flex;
         align-items: flex-start; justify-content: center;
         padding-top: 10vh;
-        z-index: 1000;
+        z-index: 2000;
         opacity: 0; pointer-events: none;
         transition: opacity 0.3s ease;
     }
@@ -276,8 +276,8 @@
                 </div>
             </div>
 
-            <div class="sidebar-footer" style="padding-top: 20px;">
-                <form action="{{ route('logout') }}" method="POST">
+            <div class="sidebar-footer">
+                <form action="{{ route('logout') }}" method="POST" style="display: flex; justify-content: center; width: 100%;">
                     @csrf
                     <button type="submit" class="logout-btn">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
@@ -346,13 +346,6 @@
                         <label for="event-time">Time</label>
                         <select id="event-time" name="time" required></select>
                     </div>
-                    <div class="form-group">
-                        <label for="event-color">Event Color</label>
-                        <div style="display: flex; gap: 10px; align-items: center;">
-                            <input type="color" id="event-color" value="#3b82f6" style="width: 50px; height: 45px; padding: 2px; cursor: pointer;">
-                            <span style="font-size: 12px; color: var(--text-muted);">Pick a color</span>
-                        </div>
-                    </div>
                 </div>
                 
                 <div class="form-group" id="status-group" style="display: none;">
@@ -412,7 +405,7 @@
                 <div class="divider"></div>
                 
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <button type="button" class="btn btn-danger" id="btn-cancel-meeting">
+                    <button type="button" class="btn btn-danger" id="btn-cancel-meeting" style="font-size: 14px;">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
                         Cancel Schedule
                     </button>

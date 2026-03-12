@@ -626,18 +626,9 @@ function openViewModal(eventId) {
     document.getElementById('view-time').textContent = formatTimeToAmer(e.time);
 
     const badge = document.getElementById('view-status-badge');
-    badge.style.display = 'none'; // Remove indicators from view details
-
     const cancelBtn = document.getElementById('btn-cancel-meeting');
-    const editBtn = document.getElementById('btn-edit-event');
-
-    if (e.status === 'completed' || new Date(e.date + 'T00:00:00') < new Date().setHours(0, 0, 0, 0)) {
-        cancelBtn.style.display = 'none';
-        editBtn.style.display = 'none';
-    } else {
-        cancelBtn.style.display = (e.status === 'cancelled') ? 'none' : 'block';
-        editBtn.style.display = 'block';
-    }
+    const editBtn = document.getElementById('btn-edit-view');
+    const deleteBtn = document.getElementById('btn-delete-view');
 
     badge.className = 'status-badge';
     let statusText = 'Upcoming';
@@ -650,11 +641,19 @@ function openViewModal(eventId) {
         statusText = 'Cancelled';
         badge.classList.add('badge-cancelled');
         badge.innerHTML = '🔴 ' + statusText;
-        cancelBtn.style.display = 'none'; // Hide if already cancelled
     } else {
         badge.classList.add('badge-upcoming');
         badge.innerHTML = '🟡 ' + statusText;
     }
+    badge.style.display = '';
+
+    // Action buttons visibility rules:
+    // - completed: hide edit/cancel (but allow delete)
+    // - cancelled: hide cancel (but allow edit + delete)
+    // - upcoming: show all
+    if (cancelBtn) cancelBtn.style.display = (e.status === 'upcoming') ? 'inline-flex' : 'none';
+    if (editBtn) editBtn.style.display = (e.status === 'completed') ? 'none' : 'inline-flex';
+    if (deleteBtn) deleteBtn.style.display = 'inline-flex';
 
     const descCon = document.getElementById('view-desc-container');
     const descEl = document.getElementById('view-desc');
@@ -665,17 +664,19 @@ function openViewModal(eventId) {
         descCon.style.display = 'none';
     }
 
-    document.getElementById('btn-edit-view').onclick = () => {
+    const editViewBtn = document.getElementById('btn-edit-view');
+    if (editViewBtn) editViewBtn.onclick = () => {
         closeModal('view-modal');
         setTimeout(() => openModal('edit', e.id), 150);
     };
 
-    document.getElementById('btn-cancel-meeting').onclick = () => {
+    if (cancelBtn) cancelBtn.onclick = () => {
         cancelMeeting(e.id);
         closeModal('view-modal');
     };
 
-    document.getElementById('btn-delete-view').onclick = () => {
+    const deleteViewBtn = document.getElementById('btn-delete-view');
+    if (deleteViewBtn) deleteViewBtn.onclick = () => {
         closeModal('view-modal');
         setTimeout(() => deleteEvent(e.id), 150);
     };

@@ -478,25 +478,33 @@ body {
 
 /* Logout Button styling */
 .logout-btn {
-    width: 100%;
-    padding: 12px 20px;
-    background: #fff1f2;
-    color: #e11d48;
-    border: 1px solid #fecdd3;
-    border-radius: 12px;
+    width: auto;
+    max-width: 180px;
+    margin: 10px auto 25px;
+    padding: 10px 24px;
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 50px;
     display: flex;
     align-items: center;
-    gap: 12px;
+    justify-content: center;
+    gap: 10px;
     font-weight: 700;
+    font-size: 14px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
 }
 
 .logout-btn:hover {
-    background: #ffe4e6;
-    border-color: #fb7185;
+    background: #dc2626;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(225, 29, 72, 0.1);
+    box-shadow: 0 6px 15px rgba(239, 68, 68, 0.35);
+}
+
+.logout-btn svg {
+    stroke: white;
 }
 
 /* Calendar Responsiveness */
