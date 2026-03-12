@@ -16,4 +16,16 @@ class DashboardController extends Controller
             'currentDate' => now()->format('l, F j, Y'),
         ]);
     }
+
+    public function scheduleList()
+    {
+        if (!session('user_id')) {
+            return redirect()->route('login');
+        }
+
+        return view('schedule-list', [
+            'username'    => session('user_name', 'Admin'),
+            'currentDate' => now()->format('l, F j, Y'),
+        ]);
+    }
 }

@@ -10,5 +10,6 @@ Route::post('/login',[LoginController::class, 'handleLogin'])->name('login.post'
 Route::get('/logout',[LoginController::class, 'logout'])->name('logout');
 
 // Dashboard (protected by session check inside controller)
-Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+Route::get('/dashboard',     [DashboardController::class, 'index'])->name('dashboard');
+Route::get('/schedule-list', [DashboardController::class, 'scheduleList'])->name('schedule.list');
 

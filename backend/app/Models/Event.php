@@ -10,9 +10,11 @@ class Event extends Model
         'id',
         'title',
         'date',
+        'end_date',
         'time',
         'description',
-        'status'
+        'status',
+        'color'
     ];
     
     // Disable auto-incrementing since we use string IDs from the frontend

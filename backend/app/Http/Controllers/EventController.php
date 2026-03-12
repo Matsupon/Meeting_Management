@@ -13,7 +13,7 @@ class EventController extends Controller
      */
     public function index()
     {
-        $events = Event::orderBy('date')->orderBy('time')->get();
+        $events = Event::orderBy('created_at', 'desc')->get();
         return response()->json(['status' => 'success', 'data' => $events]);
     }
 
@@ -33,9 +33,11 @@ class EventController extends Controller
             }
             $event->title       = $input['title']       ?? $event->title;
             $event->date        = $input['date']        ?? $event->date;
+            $event->end_date    = $input['end_date']    ?? $event->end_date;
             $event->time        = $input['time']        ?? $event->time;
             $event->description = $input['description'] ?? $event->description;
             $event->status      = $input['status']      ?? $event->status;
+            $event->color       = $input['color']       ?? $event->color;
             $event->save();
         } else {
             // Create
@@ -43,9 +45,11 @@ class EventController extends Controller
                 'id'          => (string) Str::uuid(),
                 'title'       => $input['title']       ?? '',
                 'date'        => $input['date']        ?? '',
+                'end_date'    => $input['end_date']    ?? null,
                 'time'        => $input['time']        ?? '',
                 'description' => $input['description'] ?? '',
                 'status'      => $input['status']      ?? 'upcoming',
+                'color'       => $input['color']       ?? '#3b82f6',
             ]);
         }
 

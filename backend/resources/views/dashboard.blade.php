@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Dashboard - Meeting Management System')
+@section('title', 'Dashboard - Schedule Management System')
 
 @push('styles')
 <style>
@@ -103,17 +103,6 @@
         flex-direction: column;
     }
 
-    #calendar-header {
-        margin-bottom: 20px;
-    }
-
-    #calendar-grid {
-        flex: 1;
-        display: grid;
-        grid-template-columns: repeat(7, 1fr);
-        gap: 10px;
-        grid-auto-rows: 1fr;
-    }
 
     /* RIGHT PANEL */
     .right-panel {
@@ -144,12 +133,25 @@
     .agenda-scroll-container {
         flex: 1;
         overflow-y: auto;
+        overflow-x: hidden;
         padding-right: 5px;
         display: flex;
         flex-direction: column;
         gap: 10px;
         scrollbar-width: thin;
     }
+
+    .reminder-close {
+        position: absolute;
+        top: 8px;
+        right: 12px;
+        font-size: 20px;
+        line-height: 1;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: color 0.2s;
+    }
+    .reminder-close:hover { color: var(--text-main); }
 
 
     /* Modals */
@@ -200,6 +202,7 @@
         box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 1100;
         display: flex; align-items: center; gap: 15px;
         transition: top 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: pointer;
     }
     .reminder-alert.show { top: 30px; }
     .reminder-icon { color: var(--accent); }
@@ -209,6 +212,9 @@
     /* Event Row Hover */
     .event-row {
         cursor: pointer;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
     }
     .event-row:hover {
         transform: scale(1.02);
@@ -221,53 +227,38 @@
 
     <!-- Reminder Alert -->
     <div class="reminder-alert" id="reminder-alert">
+        <span class="reminder-close" id="reminder-close">&times;</span>
         <div class="reminder-icon">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
         </div>
         <div class="reminder-text" id="reminder-text"></div>
     </div>
 
-    <div class="dashboard-wrapper">
-        <!-- LEFT PANEL -->
-        <div class="left-panel">
-            <header style="padding-bottom: 5px;">
-                <div class="welcome-area">
-                    <h1 style="font-size: 24px; color: var(--primary-blue); font-weight: 700; margin-bottom: 2px;">Welcome back, {{ $username }}</h1>
-                    <p style="color: var(--text-muted); font-size: 14px; font-weight: 500;">{{ $currentDate }}</p>
-
-                </div>
-            </header>
-
-            <section class="stats-bento">
-                <div class="bento-card glass" style="padding: 10px;">
-                    <h3 style="font-size: 14px; color: var(--text-main); margin-bottom: 5px; font-weight: 600;">Total Meetings This Month</h3>
-                    <div class="bento-number" id="stats-month" style="font-size: 40px;">0</div>
-                </div>
-                <div class="bento-card glass" id="next-meeting-bento" style="display: flex; flex-direction: column; justify-content: center; align-items: center; border: 2px solid rgba(59, 130, 246, 0.3); padding: 10px;">
-                    <!-- Dynamically populated via JS -->
-                    <h3 style="color: var(--primary-blue); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 2px;">NEXT MEETING</h3>
-                    <div style="color: var(--accent); font-weight: 600; font-size: 14px; margin-bottom: 2px;">Starts in -- mins</div>
-                    <div style="font-size: 18px; font-weight: 700; color: var(--text-main); line-height: 1.2;">No upcoming meetings</div>
+    <div class="dashboard-viewport">
+        <!-- Sidebar -->
+        <aside class="sidebar-main glass" id="sidebar-main">
+            <div class="sidebar-content">
+                <div class="legend-section">
+                    <h4>LEGEND:</h4>
+                    <div class="legend-item"><span class="legend-color green"></span> 1 week before the schedule</div>
+                    <div class="legend-item"><span class="legend-color yellow"></span> 5 days before the schedule</div>
+                    <div class="legend-item"><span class="legend-color red"></span> 3 days before the schedule</div>
+                    <div class="legend-item"><span class="legend-color blue"></span> Finished schedule</div>
                 </div>
 
-            </section>
-
-            <div class="control-center glass" style="flex-direction: column; align-items: stretch; gap: 20px;">
-                <div class="filter-chips" id="status-filters">
-                    <div class="chip active" data-status="upcoming">🟡 Upcoming</div>
-                    <div class="chip" data-status="completed">🟢 Finished</div>
-                    <div class="chip" data-status="cancelled">🔴 Cancelled</div>
-                    <div class="chip" data-status="all">Show All</div>
-                </div>
-
-                
-                <div style="display: flex; gap: 15px;">
-                    <div style="flex: 1;">
-                        <input type="text" id="search-input" placeholder="Search for a meeting..." style="width: 100%; padding: 12px 18px; border-radius: var(--border-radius-md); border: 2px solid #e2e8f0; font-size: var(--font-size-base); background: #f8fafc;">
+                <div class="sidebar-search-filters">
+                    <div class="form-group">
+                        <input type="text" id="search-input" placeholder="Search for a schedule..." class="sidebar-input">
                     </div>
-                    <div>
-                        <select id="filter-time-dropdown" style="padding: 12px 18px; border-radius: var(--border-radius-md); border: 2px solid #e2e8f0; font-size: var(--font-size-base); font-weight: 600; background: #f8fafc; color: var(--primary-blue); cursor: pointer; min-width: 140px; height: 100%;">
 
+                    <div class="filter-chips sidebar-chips" id="status-filters">
+                        <div class="chip active" data-status="upcoming">Upcoming</div>
+                        <div class="chip" data-status="completed">Finished</div>
+                        <div class="chip" data-status="cancelled">Cancelled</div>
+                    </div>
+
+                    <div style="margin-top: 15px;">
+                        <select id="filter-time-dropdown" class="sidebar-select">
                             <option value="all">All Time</option>
                             <option value="today">Today</option>
                             <option value="this-week">This Week</option>
@@ -276,67 +267,91 @@
                         </select>
                     </div>
                 </div>
-            </div>
 
-            <div class="agenda-scroll-container" id="event-list-container">
-                <!-- Event rows injected via JS -->
-            </div>
-        </div>
-
-        <!-- RIGHT PANEL -->
-        <div class="right-panel">
-            <div class="top-actions">
-                <button class="btn btn-accent" id="btn-add-event" onclick="openModal('add')" style="padding: 12px 24px; font-size: var(--font-size-base); border-radius: 100px;">
-
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="12" y1="5" x2="12" y2="19"></line>
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                    </svg>
-                    Add New Meeting
-                </button>
-            </div>
-
-            <section class="calendar-section glass">
-                <div id="calendar-header" style="display: flex; justify-content: space-between; align-items: center;">
-                    <button class="btn btn-outline" id="prev-month" style="padding: 10px 20px;">&larr;</button>
-                    <h2 id="calendar-month-year" style="font-size: var(--font-size-xl); color: var(--primary-blue); font-weight: 700;">Month Year</h2>
-                    <button class="btn btn-outline" id="next-month" style="padding: 10px 20px;">&rarr;</button>
-                </div>
+                <div class="sidebar-divider"></div>
                 
-                <div id="calendar-days-header" style="display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-weight: 600; color: var(--text-muted); margin-bottom: 10px; font-size: var(--font-size-sm);">
-                    <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+                <h4 style="margin: 20px 0 10px; color: var(--text-muted); font-size: 12px; text-transform: uppercase;">Schedules</h4>
+                <div class="agenda-scroll-container sidebar-list" id="event-list-container">
+                    <!-- Event rows injected via JS -->
+                </div>
+            </div>
+
+            <div class="sidebar-footer" style="padding-top: 20px;">
+                <form action="{{ route('logout') }}" method="POST">
+                    @csrf
+                    <button type="submit" class="logout-btn">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                        <span>Logout</span>
+                    </button>
+                </form>
+            </div>
+        </aside>
+
+        <main class="main-content" id="main-content">
+            <header class="dashboard-header">
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <button class="hamburger-menu" id="hamburger-menu">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2.5"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                    </button>
+                    <h1>Schedule Management System</h1>
+                </div>
+                <button class="btn btn-primary" id="btn-add-schedule">+ Add New Schedule</button>
+            </header>
+
+            <section class="calendar-center-wrapper">
+                <div class="calendar-header-actions glass">
+                    <button class="calendar-nav-btn" id="prev-month">&lt;</button>
+                    <h2 id="calendar-month-year" style="font-size: 18px; font-weight: 800; color: var(--text-main); min-width: 180px; text-align: center;"></h2>
+                    <button class="calendar-nav-btn" id="next-month">&gt;</button>
                 </div>
 
-                <div id="calendar-grid">
-                    <!-- Cells injected via JS -->
+                <div class="calendar-grid-container glass">
+                    <div class="calendar-weekdays">
+                        <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+                    </div>
+                    <div class="calendar-grid" id="calendar-grid"></div>
                 </div>
             </section>
-        </div>
+        </main>
     </div>
 
     <!-- Add/Edit Event Modal -->
     <div class="modal-overlay" id="event-modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 id="modal-title">Add New Meeting</h2>
+                <h2 id="modal-title">Add New Schedule</h2>
             </div>
             
             <form id="event-form">
                 <input type="hidden" id="event-id">
                 
                 <div class="form-group">
-                    <label for="event-title">Meeting Title</label>
+                    <label for="event-title">Schedule Title</label>
                     <input type="text" id="event-title" required placeholder="e.g. Design Sync">
                 </div>
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="event-date">Date</label>
-                        <input type="date" id="event-date" required>
+                        <label for="event-date">Start Date</label>
+                        <input type="date" id="event-date" name="date" required>
                     </div>
                     <div class="form-group">
+                        <label for="event-end-date">End Date (Optional)</label>
+                        <input type="date" id="event-end-date" name="end_date">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
                         <label for="event-time">Time</label>
-                        <select id="event-time" required style="width: 100%;"></select>
+                        <select id="event-time" name="time" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="event-color">Event Color</label>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="color" id="event-color" value="#3b82f6" style="width: 50px; height: 45px; padding: 2px; cursor: pointer;">
+                            <span style="font-size: 12px; color: var(--text-muted);">Pick a color</span>
+                        </div>
                     </div>
                 </div>
                 
@@ -356,7 +371,7 @@
                 
                 <div style="display: flex; justify-content: flex-end; gap: 15px; margin-top: 30px;">
                     <button type="button" class="btn" style="background: transparent; color: var(--text-muted); box-shadow: none;" onclick="handleCancelModal()">Cancel</button>
-                    <button type="submit" class="btn btn-accent" id="save-event-btn">Save Meeting</button>
+                    <button type="submit" class="btn btn-accent" id="save-event-btn">Save Schedule</button>
                 </div>
             </form>
         </div>
@@ -366,7 +381,7 @@
     <div class="modal-overlay" id="view-modal">
         <div class="modal-content" style="max-width: 600px; padding: 40px;">
             <div style="margin-bottom: 20px;">
-                <h2 id="view-title" style="word-break: break-word; font-size: 32px; color: var(--text-main); font-weight: 800; margin-bottom: 10px;">Meeting Title</h2>
+                <h2 id="view-title" style="word-break: break-word; font-size: 32px; color: var(--text-main); font-weight: 800; margin-bottom: 10px;">Schedule Title</h2>
                 <div id="view-status-badge" class="status-badge badge-upcoming" style="font-size: 16px; padding: 6px 14px;">🟡 Upcoming</div>
             </div>
             
@@ -399,7 +414,7 @@
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <button type="button" class="btn btn-danger" id="btn-cancel-meeting">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
-                        Cancel Meeting
+                        Cancel Schedule
                     </button>
                     <button type="button" class="btn btn-subdued" id="btn-delete-view">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
@@ -413,13 +428,16 @@
     <!-- Day Events Modal -->
     <div class="modal-overlay" id="day-events-modal">
         <div class="modal-content" style="max-height: 80vh; overflow-y: auto;">
-            <div class="modal-header">
-                <h2 id="day-events-title">Meetings</h2>
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 id="day-events-title">Schedules</h2>
+                <button class="btn btn-accent btn-sm" id="btn-add-from-day" style="padding: 8px 16px; font-size: 12px; border-radius: 50px;">+ Add Schedule</button>
             </div>
             <div id="day-events-list"></div>
         </div>
     </div>
 
+        </main>
+    </div>
 @endsection
 
 @push('scripts')

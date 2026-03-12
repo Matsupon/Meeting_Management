@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Login - Meeting Management System')
+@section('title', 'Login - Schedule Management System')
 
 @push('styles')
 <style>
