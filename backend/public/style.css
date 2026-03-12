@@ -237,8 +237,8 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 44px;
-    color: #22c55e; /* Green checkmark */
+    font-size: 48px;
+    color: #ffffff; /* White checkmark */
     font-weight: 900;
     pointer-events: none;
     opacity: 0;
@@ -247,6 +247,43 @@ body {
 
 .calendar-day:hover.finished-day::after {
     opacity: 1;
+}
+
+.calendar-day.past-no-finish {
+    background: #e5e7eb;
+    color: #9ca3af;
+    cursor: default;
+}
+
+.calendar-day.past-no-finish:hover {
+    background: #e5e7eb !important;
+    box-shadow: none;
+    transform: none;
+}
+
+.calendar-day.finished-day {
+    background: #e5e7eb;
+    color: #9ca3af;
+    position: relative;
+}
+
+.calendar-day.finished-day::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: rgba(148, 163, 184, 0.45); /* gray overlay covering title */
+    pointer-events: none;
+}
+
+.calendar-day.finished-day > * {
+    position: relative;
+    z-index: 1;
+}
+
+.calendar-day.finished-day:hover {
+    background: rgba(187, 247, 208, 0.9) !important; /* light green */
+    box-shadow: 0 10px 25px rgba(22, 163, 74, 0.3);
 }
 
 .chip {
@@ -578,11 +615,11 @@ body {
 
 /* Time Picker refinement */
 select#event-time, select#edit-event-time {
-    height: 40px;
-    padding: 0 15px;
+    height: 32px;
+    padding: 0 10px;
     border-radius: 10px;
     border: 1px solid #e2e8f0;
-    font-size: 14px;
+    font-size: 12px;
     background-color: white;
     /* Dropdown direction hints for browser */
     appearance: none;
@@ -593,11 +630,14 @@ select#event-time, select#edit-event-time {
     background-size: 18px;
 }
 
+/* (custom timepicker styles removed; using native select) */
+
 /* Legend Styling */
 .legend-section {
     background: #f8fafc;
     padding: 15px;
     border-radius: var(--border-radius-md);
+    margin-top: 20px;
     margin-bottom: 25px;
     border: 1px solid #e2e8f0;
 }
@@ -669,10 +709,10 @@ select#event-time, select#edit-event-time {
 /* Reminder Alert */
 .reminder-alert {
     position: fixed;
-    top: 50%;
+    top: 90px;
     left: 50%;
-    transform: translate(-50%, -50%) scale(0.9);
-    background: white;
+    transform: translateX(-50%) scale(0.9);
+    background: #fee2e2;
     padding: 24px 30px;
     border-radius: var(--border-radius-lg);
     box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.25);
@@ -683,7 +723,8 @@ select#event-time, select#edit-event-time {
     opacity: 0;
     pointer-events: none;
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    border: 1px solid rgba(226, 232, 240, 0.8);
+    border: 1px solid #fecaca;
+    border-left: 6px solid #ef4444;
     cursor: pointer;
     width: 90%;
     max-width: 450px;
@@ -691,7 +732,7 @@ select#event-time, select#edit-event-time {
 
 .reminder-alert.show {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
+    transform: translateX(-50%) scale(1);
     pointer-events: auto;
 }
 
@@ -702,13 +743,18 @@ select#event-time, select#edit-event-time {
 .reminder-icon {
     width: 50px;
     height: 50px;
-    background: rgba(239, 68, 68, 0.1); /* Red background */
-    color: #ef4444; /* Red icon color */
+    background: rgba(239, 68, 68, 0.12) !important; /* Red background */
+    color: #ef4444 !important; /* Red icon color */
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+}
+
+.reminder-icon svg {
+    stroke: #ef4444 !important;
+    color: #ef4444 !important;
 }
 
 .reminder-text {
@@ -730,4 +776,15 @@ select#event-time, select#edit-event-time {
     font-size: 14px;
     color: var(--text-muted);
     font-weight: 500;
+}
+
+.reminder-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #111827;
+}
+
+.reminder-meta {
+    font-size: 13px;
+    color: #4b5563;
 }

@@ -227,7 +227,6 @@
 
     <!-- Reminder Alert -->
     <div class="reminder-alert" id="reminder-alert">
-        <span class="reminder-close" id="reminder-close">&times;</span>
         <div class="reminder-icon">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
         </div>
@@ -240,9 +239,9 @@
             <div class="sidebar-content">
                 <div class="legend-section">
                     <h4>LEGEND:</h4>
-                    <div class="legend-item"><span class="legend-color green"></span> 1 week before the schedule</div>
-                    <div class="legend-item"><span class="legend-color yellow"></span> 5 days before the schedule</div>
                     <div class="legend-item"><span class="legend-color red"></span> 3 days before the schedule</div>
+                    <div class="legend-item"><span class="legend-color yellow"></span> 5 days before the schedule</div>
+                    <div class="legend-item"><span class="legend-color green"></span> 1 week before the schedule</div>
                     <div class="legend-item"><span class="legend-color blue"></span> Finished schedule</div>
                 </div>
 
@@ -255,16 +254,6 @@
                         <div class="chip active" data-status="upcoming">Upcoming</div>
                         <div class="chip" data-status="completed">Finished</div>
                         <div class="chip" data-status="cancelled">Cancelled</div>
-                    </div>
-
-                    <div style="margin-top: 15px;">
-                        <select id="filter-time-dropdown" class="sidebar-select">
-                            <option value="all">All Time</option>
-                            <option value="today">Today</option>
-                            <option value="this-week">This Week</option>
-                            <option value="this-month">This Month</option>
-                            <option value="selected-day" style="display:none;" id="selected-day-option">Selected Day</option>
-                        </select>
                     </div>
                 </div>
 
@@ -375,7 +364,6 @@
         <div class="modal-content" style="max-width: 600px; padding: 40px;">
             <div style="margin-bottom: 20px;">
                 <h2 id="view-title" style="word-break: break-word; font-size: 32px; color: var(--text-main); font-weight: 800; margin-bottom: 10px;">Schedule Title</h2>
-                <div id="view-status-badge" class="status-badge badge-upcoming" style="font-size: 16px; padding: 6px 14px;">🟡 Upcoming</div>
             </div>
             
             <div style="margin-bottom: 25px; display: flex; gap: 15px; flex-direction: column;">

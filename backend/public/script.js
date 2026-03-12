@@ -57,18 +57,17 @@ document.addEventListener('DOMContentLoaded', () => {
     eventForm.addEventListener('submit', handleEventSubmit);
 
     searchInput.addEventListener('input', () => {
-        if (searchInput.value && filterTimeDropdown.value === 'selected-day') {
-            filterTimeDropdown.value = 'all';
-        }
         renderEventList();
     });
 
-    filterTimeDropdown.addEventListener('change', () => {
-        if (filterTimeDropdown.value !== 'selected-day') {
-            selectedFilterDate = null;
-        }
-        renderEventList();
-    });
+    if (filterTimeDropdown) {
+        filterTimeDropdown.addEventListener('change', () => {
+            if (filterTimeDropdown.value !== 'selected-day') {
+                selectedFilterDate = null;
+            }
+            renderEventList();
+        });
+    }
 
     statusChips.forEach(chip => {
         chip.addEventListener('click', () => {
@@ -113,6 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initial check for reminders after a short delay to ensure UI is ready
     setTimeout(checkUpcomingReminders, 1000);
+
 });
 
 function formatTimeToAmer(timeStr) {
@@ -216,6 +216,10 @@ function renderCalendar() {
             cell.classList.add('finished-day');
         }
 
+        if (isPast && !hasFinishedEvents) {
+            cell.classList.add('past-no-finish');
+        }
+
         const dayText = document.createElement('div');
         dayText.textContent = i;
         dayText.style.fontWeight = '700';
@@ -260,69 +264,73 @@ function renderCalendar() {
             cell.appendChild(eventBlockContainer);
         }
 
-        cell.addEventListener('mouseenter', () => {
-            if (cellDate !== new Date().toISOString().split('T')[0]) {
-                cell.style.background = 'white';
-            }
-            cell.style.transform = 'translateY(-2px)';
-            cell.style.boxShadow = '0 10px 15px -3px rgba(37,99,235,0.1)';
-        });
-        cell.addEventListener('mouseleave', () => {
-            if (cellDate !== new Date().toISOString().split('T')[0]) {
-                cell.style.background = 'rgba(255, 255, 255, 0.85)';
-            }
-            cell.style.transform = 'translateY(0)';
-            cell.style.boxShadow = 'var(--box-shadow)';
-        });
+        if (!isPast || hasFinishedEvents) {
+            cell.addEventListener('mouseenter', () => {
+                if (cellDate !== new Date().toISOString().split('T')[0]) {
+                    cell.style.background = 'white';
+                }
+                cell.style.transform = 'translateY(-2px)';
+                cell.style.boxShadow = '0 10px 15px -3px rgba(37,99,235,0.1)';
+            });
+            cell.addEventListener('mouseleave', () => {
+                if (cellDate !== new Date().toISOString().split('T')[0]) {
+                    cell.style.background = 'rgba(255, 255, 255, 0.85)';
+                }
+                cell.style.transform = 'translateY(0)';
+                cell.style.boxShadow = 'var(--box-shadow)';
+            });
 
-        cell.addEventListener('click', () => {
-            if (dayEvents.length > 0) {
-                const modal = document.getElementById('day-events-modal');
-                document.getElementById('day-events-title').textContent = `Events for ${i} ${monthNames[month]}`;
-                const addBtn = document.getElementById('btn-add-from-day');
-                addBtn.onclick = () => {
-                    closeModal('day-events-modal');
+            cell.addEventListener('click', () => {
+                if (dayEvents.length === 1) {
+                    openViewModal(dayEvents[0].id);
+                } else if (dayEvents.length > 1) {
+                    const modal = document.getElementById('day-events-modal');
+                    document.getElementById('day-events-title').textContent = `Events for ${i} ${monthNames[month]}`;
+                    const addBtn = document.getElementById('btn-add-from-day');
+                    addBtn.onclick = () => {
+                        closeModal('day-events-modal');
+                        selectedFilterDate = cellDate;
+                        openModal('add');
+                        document.getElementById('event-date').value = cellDate;
+                    };
+
+                    const list = document.getElementById('day-events-list');
+                    list.innerHTML = '';
+                    list.style.cssText = 'display: flex; flex-direction: column; gap: 15px; margin-top: 20px;';
+
+                    dayEvents.forEach(e => {
+                        const card = document.createElement('div');
+                        card.className = 'glass';
+                        card.style.cssText = 'padding: 20px; border-radius: var(--border-radius-md); box-shadow: var(--box-shadow); cursor: pointer; text-align: left; transition: transform 0.2s ease;';
+                        let dotClass = 'status-upcoming';
+                        if (e.status === 'completed') dotClass = 'status-completed';
+                        if (e.status === 'cancelled') dotClass = 'status-cancelled';
+                        card.innerHTML = `
+                            <h3 style="font-size: 24px; font-weight: 700; color: var(--primary-blue); margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; display: flex; align-items: center; gap: 8px;">
+                                <div class="status-dot ${dotClass}"></div>
+                                ${e.title}
+                            </h3>
+                            <div style="color: var(--text-muted); font-size: var(--font-size-base); display: flex; align-items: center; gap: 5px;">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                ${formatTimeToAmer(e.time)}
+                            </div>
+                        `;
+                        card.onmouseenter = () => card.style.transform = 'translateY(-2px)';
+                        card.onmouseleave = () => card.style.transform = 'translateY(0)';
+                        card.onclick = () => {
+                            closeModal('day-events-modal');
+                            openViewModal(e.id);
+                        };
+                        list.appendChild(card);
+                    });
+                    modal.classList.add('active');
+                } else {
                     selectedFilterDate = cellDate;
                     openModal('add');
                     document.getElementById('event-date').value = cellDate;
-                };
-
-                const list = document.getElementById('day-events-list');
-                list.innerHTML = '';
-                list.style.cssText = 'display: flex; flex-direction: column; gap: 15px; margin-top: 20px;';
-
-                dayEvents.forEach(e => {
-                    const card = document.createElement('div');
-                    card.className = 'glass';
-                    card.style.cssText = 'padding: 20px; border-radius: var(--border-radius-md); box-shadow: var(--box-shadow); cursor: pointer; text-align: left; transition: transform 0.2s ease;';
-                    let dotClass = 'status-upcoming';
-                    if (e.status === 'completed') dotClass = 'status-completed';
-                    if (e.status === 'cancelled') dotClass = 'status-cancelled';
-                    card.innerHTML = `
-                        <h3 style="font-size: 24px; font-weight: 700; color: var(--primary-blue); margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; display: flex; align-items: center; gap: 8px;">
-                            <div class="status-dot ${dotClass}"></div>
-                            ${e.title}
-                        </h3>
-                        <div style="color: var(--text-muted); font-size: var(--font-size-base); display: flex; align-items: center; gap: 5px;">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                            ${formatTimeToAmer(e.time)}
-                        </div>
-                    `;
-                    card.onmouseenter = () => card.style.transform = 'translateY(-2px)';
-                    card.onmouseleave = () => card.style.transform = 'translateY(0)';
-                    card.onclick = () => {
-                        closeModal('day-events-modal');
-                        openViewModal(e.id);
-                    };
-                    list.appendChild(card);
-                });
-                modal.classList.add('active');
-            } else {
-                selectedFilterDate = cellDate;
-                openModal('add');
-                document.getElementById('event-date').value = cellDate;
-            }
-        });
+                }
+            });
+        }
 
         calendarGrid.appendChild(cell);
     }
@@ -414,10 +422,9 @@ function updateNextMeeting() {
 
 function generateTimeOptions() {
     timeSelect.innerHTML = '';
-    // Restrict from 8:00 AM to 8:00 PM
-    for (let i = 8; i <= 20; i++) {
+    // Restrict from 8:00 AM to 6:00 PM to keep dropdown shorter
+    for (let i = 8; i <= 18; i++) {
         for (let m of ['00', '30']) {
-            if (i === 20 && m === '30') continue; // Stop at 8:00 PM
             const val = `${String(i).padStart(2, '0')}:${m}`;
             const opt = document.createElement('option');
             opt.value = val;
@@ -480,7 +487,7 @@ function renderEventList() {
     eventListContainer.innerHTML = '';
 
     const term = searchInput.value.toLowerCase();
-    const filterTime = filterTimeDropdown.value;
+    const filterTime = filterTimeDropdown ? filterTimeDropdown.value : 'all';
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -587,7 +594,7 @@ function openModal(mode, eventId) {
     document.getElementById('event-id').value = '';
 
     if (mode === 'add') {
-        document.getElementById('modal-title').textContent = 'Add New Event';
+        document.getElementById('modal-title').textContent = 'Add New Schedule';
         document.getElementById('event-date').value = selectedFilterDate || new Date().toISOString().split('T')[0];
         document.getElementById('status-group').style.display = 'none';
     } else if (mode === 'edit') {
@@ -625,27 +632,9 @@ function openViewModal(eventId) {
     document.getElementById('view-date').textContent = dateText;
     document.getElementById('view-time').textContent = formatTimeToAmer(e.time);
 
-    const badge = document.getElementById('view-status-badge');
     const cancelBtn = document.getElementById('btn-cancel-meeting');
     const editBtn = document.getElementById('btn-edit-view');
     const deleteBtn = document.getElementById('btn-delete-view');
-
-    badge.className = 'status-badge';
-    let statusText = 'Upcoming';
-
-    if (e.status === 'completed') {
-        statusText = 'Completed';
-        badge.classList.add('badge-completed');
-        badge.innerHTML = '🟢 ' + statusText;
-    } else if (e.status === 'cancelled') {
-        statusText = 'Cancelled';
-        badge.classList.add('badge-cancelled');
-        badge.innerHTML = '🔴 ' + statusText;
-    } else {
-        badge.classList.add('badge-upcoming');
-        badge.innerHTML = '🟡 ' + statusText;
-    }
-    badge.style.display = '';
 
     // Action buttons visibility rules:
     // - completed: hide edit/cancel (but allow delete)
@@ -763,13 +752,21 @@ function checkUpcomingReminders() {
         const alert = document.getElementById('reminder-alert');
         const text = document.getElementById('reminder-text');
 
-        let displayTitle = nextOne.title;
-        if (displayTitle.length > 25) displayTitle = displayTitle.substring(0, 25) + '...';
+        const evtDate = new Date(nextOne.date + 'T00:00:00');
+        const daysLeft = Math.max(1, Math.ceil((evtDate - now) / (1000 * 60 * 60 * 24)));
+        const timeStr = formatTimeToAmer(nextOne.time);
 
-        text.innerHTML = `<strong>Schedule: ${displayTitle}</strong><span>In ${Math.ceil((new Date(nextOne.date) - now) / (1000 * 60 * 60 * 24))} days (${nextOne.date})</span>`;
+        let displayTitle = nextOne.title;
+        if (displayTitle.length > 30) displayTitle = displayTitle.substring(0, 30) + '...';
+
+        text.innerHTML = `
+            <strong>Psst! You have an upcoming schedule:</strong>
+            <span class="reminder-title">${displayTitle}</span>
+            <span class="reminder-meta">${daysLeft} day${daysLeft > 1 ? 's' : ''} left • ${timeStr}</span>
+        `;
         alert.classList.add('show');
 
-        alert.onclick = (e) => {
+        alert.onclick = () => {
             openViewModal(nextOne.id);
             alert.classList.remove('show');
         };
