@@ -202,7 +202,7 @@
         position: fixed; top: -120px; left: 50%; transform: translateX(-50%);
         background: var(--card-bg);
         padding: 20px 30px; border-radius: var(--border-radius-md);
-        box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 1100;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 60000;
         display: flex; align-items: center; gap: 15px;
         transition: top 0.5s cubic-bezier(0.4, 0, 0.2, 1);
         cursor: pointer;
@@ -423,7 +423,7 @@
                     <label for="event-title">
                         Title of Schedule
                     </label>
-                    <input type="text" id="event-title" required placeholder="e.g. Quarterly Planning Meeting">
+                    <input type="text" id="event-title" required placeholder="e.g. Training">
                 </div>
 
                 <div class="form-row">
@@ -431,13 +431,13 @@
                         <label for="event-location">
                             Location
                         </label>
-                        <input type="text" id="event-location" name="location" placeholder="e.g. Manila Office, Zoom, Client Site">
+                        <input type="text" id="event-location" name="location" placeholder="e.g. Surigao City">
                     </div>
                     <div class="form-group">
                         <label for="event-classification">
                             Classification of Clients
                         </label>
-                        <input type="text" id="event-classification" name="classification" placeholder="e.g. New Client, Existing Client">
+                        <input type="text" id="event-classification" name="classification" placeholder="e.g. Women, Youth, IP, Farmers">
                     </div>
                 </div>
 
@@ -447,7 +447,7 @@
                         <input type="date" id="event-date" name="date" required>
                     </div>
                     <div class="form-group">
-                        <label for="event-end-date">Date Ended</label>
+                        <label for="event-end-date">Date Ended (optional)</label>
                         <input type="date" id="event-end-date" name="end_date">
                     </div>
                 </div>
