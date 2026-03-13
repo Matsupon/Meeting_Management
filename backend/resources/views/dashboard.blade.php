@@ -143,13 +143,16 @@
 
     .reminder-close {
         position: absolute;
-        top: 8px;
-        right: 12px;
-        font-size: 20px;
+        top: 6px;
+        right: 10px;
+        font-size: 32px;
         line-height: 1;
         color: var(--text-muted);
         cursor: pointer;
         transition: color 0.2s;
+        background: transparent;
+        border: none;
+        padding: 4px;
     }
     .reminder-close:hover { color: var(--text-main); }
 
@@ -163,7 +166,7 @@
         -webkit-backdrop-filter: blur(8px);
         display: flex;
         align-items: flex-start; justify-content: center;
-        padding-top: 10vh;
+        padding-top: 6vh;
         z-index: 2000;
         opacity: 0; pointer-events: none;
         transition: opacity 0.3s ease;
@@ -196,18 +199,23 @@
 
     /* Reminder Alert */
     .reminder-alert {
-        position: fixed; top: -100px; left: 50%; transform: translateX(-50%);
-        background: var(--card-bg); border-left: 6px solid var(--accent);
+        position: fixed; top: -120px; left: 50%; transform: translateX(-50%);
+        background: var(--card-bg);
         padding: 20px 30px; border-radius: var(--border-radius-md);
         box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 1100;
         display: flex; align-items: center; gap: 15px;
         transition: top 0.5s cubic-bezier(0.4, 0, 0.2, 1);
         cursor: pointer;
+        position: fixed;
+        min-width: 320px;
+        max-width: 520px;
     }
     .reminder-alert.show { top: 30px; }
     .reminder-icon { color: var(--accent); }
     .reminder-text strong { display: block; font-size: var(--font-size-lg); color: var(--text-main); }
     .reminder-text span { color: var(--text-muted); font-size: var(--font-size-base); }
+
+    .reminder-item:hover { background: #f8fafc; }
 
     /* Event Row Hover */
     .event-row {
@@ -220,6 +228,77 @@
         transform: scale(1.02);
         box-shadow: 0 15px 30px -5px rgba(37,99,235,0.15);
     }
+
+    .color-picker-wrap {
+        position: relative;
+        width: 100%;
+    }
+    .color-picker-trigger {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 18px;
+        font-size: var(--font-size-base);
+        font-weight: 600;
+        border: 2px solid #e2e8f0;
+        border-radius: var(--border-radius-md);
+        background: #f8fafc;
+        color: var(--text-main);
+        cursor: pointer;
+        text-align: left;
+    }
+    .color-picker-trigger:hover {
+        border-color: var(--primary-blue);
+        background: #fff;
+    }
+    .color-picker-trigger .color-picker-swatch {
+        width: 24px;
+        height: 24px;
+        border-radius: 8px;
+        border: 1px solid rgba(0,0,0,0.1);
+        flex-shrink: 0;
+        margin-left: 12px;
+    }
+    .color-picker-dropdown {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        margin-top: 6px;
+        background: #fff;
+        border: 2px solid #e2e8f0;
+        border-radius: var(--border-radius-md);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        z-index: 100;
+        max-height: 280px;
+        overflow-y: auto;
+    }
+    .color-picker-dropdown.open {
+        display: block;
+    }
+    .color-picker-option {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 18px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: var(--font-size-base);
+        transition: background 0.15s;
+    }
+    .color-picker-option:hover {
+        background: #f1f5f9;
+    }
+    .color-picker-option .color-picker-swatch {
+        width: 22px;
+        height: 22px;
+        border-radius: 6px;
+        border: 1px solid rgba(0,0,0,0.1);
+        flex-shrink: 0;
+        margin-left: 12px;
+    }
 </style>
 @endpush
 
@@ -231,6 +310,7 @@
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
         </div>
         <div class="reminder-text" id="reminder-text"></div>
+        <button type="button" id="reminder-close" class="reminder-close" aria-label="Dismiss reminder">&times;</button>
     </div>
 
     <div class="dashboard-viewport">
@@ -239,7 +319,7 @@
             <div class="sidebar-content">
                 <div class="legend-section">
                     <h4>LEGEND:</h4>
-                    <div class="legend-item"><span class="legend-color red"></span> 1-3 days before the schedule</div>
+                    <div class="legend-item"><span class="legend-color amber"></span> 1-3 days before the schedule</div>
                     <div class="legend-item"><span class="legend-color yellow"></span> 4-6 days before the schedule</div>
                     <div class="legend-item"><span class="legend-color green"></span> more than 6 days before the schedule</div>
                     <div class="legend-item"><span class="legend-color blue"></span> Ongoing schedule</div>
@@ -340,25 +420,35 @@
                 <input type="hidden" id="event-id">
                 
                 <div class="form-group">
-                    <label for="event-title">Schedule Title</label>
-                    <input type="text" id="event-title" required placeholder="e.g. Design Sync">
+                    <label for="event-title">
+                        Title of Schedule
+                    </label>
+                    <input type="text" id="event-title" required placeholder="e.g. Quarterly Planning Meeting">
                 </div>
-                
+
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="event-date">Start Date</label>
-                        <input type="date" id="event-date" name="date" required>
+                        <label for="event-location">
+                            Location
+                        </label>
+                        <input type="text" id="event-location" name="location" placeholder="e.g. Manila Office, Zoom, Client Site">
                     </div>
                     <div class="form-group">
-                        <label for="event-end-date">End Date (Optional)</label>
-                        <input type="date" id="event-end-date" name="end_date">
+                        <label for="event-classification">
+                            Classification of Clients
+                        </label>
+                        <input type="text" id="event-classification" name="classification" placeholder="e.g. New Client, Existing Client">
                     </div>
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="event-time">Time</label>
-                        <select id="event-time" name="time" required></select>
+                        <label for="event-date">Date Started</label>
+                        <input type="date" id="event-date" name="date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="event-end-date">Date Ended</label>
+                        <input type="date" id="event-end-date" name="end_date">
                     </div>
                 </div>
                 
@@ -370,7 +460,30 @@
                         <option value="cancelled">Cancelled</option>
                     </select>
                 </div>
-                
+
+                <div class="form-group">
+                    <label>Schedule Color</label>
+                    <input type="hidden" id="event-color-value" name="event-color" value="#93c5fd">
+                    <div class="color-picker-wrap" id="event-color-picker-wrap">
+                        <button type="button" class="color-picker-trigger" id="event-color-trigger" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="color-picker-trigger-name" id="event-color-trigger-name">Soft Blue</span>
+                            <span class="color-picker-swatch" id="event-color-trigger-swatch" style="background:#93c5fd;"></span>
+                        </button>
+                        <div class="color-picker-dropdown" id="event-color-dropdown" role="listbox" aria-hidden="true">
+                            <div class="color-picker-option" role="option" tabindex="0" data-hex="#93c5fd" data-name="Soft Blue"><span class="color-picker-option-name" style="color:#1e3a8a">Soft Blue</span><span class="color-picker-swatch" style="background:#93c5fd;"></span></div>
+                            <div class="color-picker-option" role="option" tabindex="0" data-hex="#fdba74" data-name="Peach"><span class="color-picker-option-name" style="color:#9a3412">Peach</span><span class="color-picker-swatch" style="background:#fdba74;"></span></div>
+                            <div class="color-picker-option" role="option" tabindex="0" data-hex="#86efac" data-name="Sage"><span class="color-picker-option-name" style="color:#14532d">Sage</span><span class="color-picker-swatch" style="background:#86efac;"></span></div>
+                            <div class="color-picker-option" role="option" tabindex="0" data-hex="#fcd34d" data-name="Amber"><span class="color-picker-option-name" style="color:#78350f">Amber</span><span class="color-picker-swatch" style="background:#fcd34d;"></span></div>
+                            <div class="color-picker-option" role="option" tabindex="0" data-hex="#c4b5fd" data-name="Warm Violet"><span class="color-picker-option-name" style="color:#4c1d95">Warm Violet</span><span class="color-picker-swatch" style="background:#c4b5fd;"></span></div>
+                            <div class="color-picker-option" role="option" tabindex="0" data-hex="#fb923c" data-name="Orange"><span class="color-picker-option-name" style="color:#9a3412">Orange</span><span class="color-picker-swatch" style="background:#fb923c;"></span></div>
+                            <div class="color-picker-option" role="option" tabindex="0" data-hex="#fef3c7" data-name="Cream"><span class="color-picker-option-name" style="color:#78350f">Cream</span><span class="color-picker-swatch" style="background:#fef3c7;"></span></div>
+                            <div class="color-picker-option" role="option" tabindex="0" data-hex="#f9a8d4" data-name="Rose"><span class="color-picker-option-name" style="color:#831843">Rose</span><span class="color-picker-swatch" style="background:#f9a8d4;"></span></div>
+                            <div class="color-picker-option" role="option" tabindex="0" data-hex="#5eead4" data-name="Mint"><span class="color-picker-option-name" style="color:#134e4a">Mint</span><span class="color-picker-swatch" style="background:#5eead4;"></span></div>
+                            <div class="color-picker-option" role="option" tabindex="0" data-hex="#d1d5db" data-name="Warm Gray"><span class="color-picker-option-name" style="color:#1f2937">Warm Gray</span><span class="color-picker-swatch" style="background:#d1d5db;"></span></div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label for="event-desc">Description (Optional)</label>
                     <textarea id="event-desc" rows="3" placeholder="Add some details..."></textarea>
@@ -387,24 +500,124 @@
     <!-- View Event Details Modal -->
     <div class="modal-overlay" id="view-modal">
         <div class="modal-content" style="max-width: 600px; padding: 40px;">
-            <div style="margin-bottom: 20px;">
-                <h2 id="view-title" style="word-break: break-word; font-size: 32px; color: var(--text-main); font-weight: 800; margin-bottom: 10px;">Schedule Title</h2>
+            <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; gap: 15px; flex-wrap: wrap;">
+                <div style="display:flex; align-items:flex-start; gap:10px; min-width: 0; flex: 1;">
+                    <h2 id="view-title" style="word-break: break-word; font-size: 32px; color: var(--text-main); font-weight: 800; margin-bottom: 10px; min-width:0;">Schedule Title</h2>
+                    <button type="button" class="view-inline-edit-btn" data-field="title" aria-label="Edit title" style="display:none; margin-top: 6px; background:transparent; border:none; cursor:pointer; padding:6px; flex-shrink:0;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"></path></svg>
+                    </button>
+                </div>
+                <span id="view-status-badge" class="status-badge badge-upcoming" style="font-size: 14px; font-weight: 700; padding: 6px 12px; border-radius: 50px; white-space: nowrap; align-self: flex-start;">🟡 Upcoming</span>
             </div>
             
-            <div style="margin-bottom: 25px; display: flex; gap: 15px; flex-direction: column;">
-                <div style="display: flex; align-items: center; gap: 12px; font-size: 22px; color: var(--text-main);">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                    <span id="view-date" style="font-weight: 700;">Date</span>
+            <div style="margin-bottom: 25px; display: flex; flex-direction: column; gap: 16px;">
+                <!-- Title edit (inline) lives in header -->
+                <div id="view-title-actions" style="display:none; justify-content:flex-end; gap:10px; margin-top:-8px;">
+                    <button type="button" class="btn btn-subdued" data-action="cancel" data-field="title">Cancel</button>
+                    <button type="button" class="btn btn-accent" data-action="save" data-field="title">Save</button>
                 </div>
-                <div style="display: flex; align-items: center; gap: 12px; font-size: 22px; color: var(--text-main);">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                    <span id="view-time" style="font-weight: 700;">Time</span>
+
+                <div style="display: flex; flex-wrap: wrap; gap: 20px;">
+                    <div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 4px; position: relative;" data-view-field="location">
+                        <span style="font-size: 13px; font-weight: 700; text-transform: uppercase; color: var(--text-muted);">Location</span>
+                        <div style="display: flex; align-items: center; gap: 8px; font-size: 16px; color: var(--text-main); min-height: 24px;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2"><path d="M21 10c0 7-9 11-9 11S3 17 3 10a9 9 0 1 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                            <span id="view-location">Location</span>
+                            <input type="text" id="view-location-input" style="display:none; flex: 1; padding: 8px 10px; border: 2px solid #e2e8f0; border-radius: 10px; background:#fff;">
+                        </div>
+                        <button type="button" class="view-inline-edit-btn" data-field="location" aria-label="Edit location" style="position:absolute; right:0; top:0; background:transparent; border:none; cursor:pointer; padding:6px;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"></path></svg>
+                        </button>
+                        <div id="view-location-actions" style="display:none; justify-content:flex-end; gap:10px; margin-top:10px;">
+                            <button type="button" class="btn btn-subdued" data-action="cancel" data-field="location">Cancel</button>
+                            <button type="button" class="btn btn-accent" data-action="save" data-field="location">Save</button>
+                        </div>
+                    </div>
+                    <div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 4px; position: relative;" data-view-field="classification">
+                        <span style="font-size: 13px; font-weight: 700; text-transform: uppercase; color: var(--text-muted);">Classification of Clients</span>
+                        <div style="display: flex; align-items: center; gap: 8px; font-size: 16px; color: var(--text-main); min-height: 24px;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2"><circle cx="12" cy="7" r="4"></circle><path d="M5.5 21a7 7 0 0 1 13 0"></path></svg>
+                            <span id="view-classification">Classification of Clients</span>
+                            <input type="text" id="view-classification-input" style="display:none; flex: 1; padding: 8px 10px; border: 2px solid #e2e8f0; border-radius: 10px; background:#fff;">
+                        </div>
+                        <button type="button" class="view-inline-edit-btn" data-field="classification" aria-label="Edit classification" style="position:absolute; right:0; top:0; background:transparent; border:none; cursor:pointer; padding:6px;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"></path></svg>
+                        </button>
+                        <div id="view-classification-actions" style="display:none; justify-content:flex-end; gap:10px; margin-top:10px;">
+                            <button type="button" class="btn btn-subdued" data-action="cancel" data-field="classification">Cancel</button>
+                            <button type="button" class="btn btn-accent" data-action="save" data-field="classification">Save</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 4px; position: relative;" data-view-field="date">
+                    <span style="font-size: 13px; font-weight: 700; text-transform: uppercase; color: var(--text-muted);">Date</span>
+                    <div style="display: flex; align-items: center; gap: 8px; font-size: 16px; color: var(--text-main); min-height: 24px;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                        <span id="view-date">Date Started – Date Ended</span>
+                    </div>
+                    <div id="view-date-edit" style="display:none; gap:12px; margin-top:10px; flex-wrap:wrap;">
+                        <div style="flex:1 1 180px;">
+                            <div style="font-size: 12px; font-weight: 800; color: var(--text-muted); margin-bottom: 6px;">Date Started</div>
+                            <input type="date" id="view-date-start-input" style="width:100%; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 10px; background:#fff;">
+                        </div>
+                        <div style="flex:1 1 180px;">
+                            <div style="font-size: 12px; font-weight: 800; color: var(--text-muted); margin-bottom: 6px;">Date Ended (optional)</div>
+                            <input type="date" id="view-date-end-input" style="width:100%; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 10px; background:#fff;">
+                        </div>
+                    </div>
+                    <button type="button" class="view-inline-edit-btn" data-field="date" aria-label="Edit date" style="position:absolute; right:0; top:0; background:transparent; border:none; cursor:pointer; padding:6px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"></path></svg>
+                    </button>
+                    <div id="view-date-actions" style="display:none; justify-content:flex-end; gap:10px; margin-top:10px;">
+                        <button type="button" class="btn btn-subdued" data-action="cancel" data-field="date">Cancel</button>
+                        <button type="button" class="btn btn-accent" data-action="save" data-field="date">Save</button>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 6px; position: relative;" data-view-field="color">
+                    <span style="font-size: 13px; font-weight: 700; text-transform: uppercase; color: var(--text-muted);">Schedule Color</span>
+                    <div style="display:flex; align-items:center; gap:10px; min-height: 24px;">
+                        <span id="view-color-name" style="font-weight:700; color: var(--text-main);">Color</span>
+                        <span id="view-color-swatch" style="width:28px; height:18px; border-radius:6px; border:1px solid rgba(0,0,0,0.12); background:#93c5fd;"></span>
+                    </div>
+                    <button type="button" class="view-inline-edit-btn" data-field="color" aria-label="Edit color" style="position:absolute; right:0; top:0; background:transparent; border:none; cursor:pointer; padding:6px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"></path></svg>
+                    </button>
+                    <div id="view-color-palette" style="display:none; margin-top:10px; gap:10px; flex-wrap:wrap;">
+                        @foreach ([
+                            ['#93c5fd','Soft Blue'],
+                            ['#fdba74','Peach'],
+                            ['#86efac','Sage'],
+                            ['#fcd34d','Amber'],
+                            ['#c4b5fd','Warm Violet'],
+                            ['#fb923c','Orange'],
+                            ['#fef3c7','Cream'],
+                            ['#f9a8d4','Rose'],
+                            ['#5eead4','Mint'],
+                            ['#d1d5db','Warm Gray']
+                        ] as $c)
+                            <button type="button" class="view-color-rect" data-hex="{{ $c[0] }}" title="{{ $c[1] }}" style="width:44px; height:26px; border-radius:8px; border:2px solid rgba(15,23,42,0.12); background: {{ $c[0] }}; cursor:pointer;"></button>
+                        @endforeach
+                    </div>
+                    <div id="view-color-actions" style="display:none; justify-content:flex-end; gap:10px; margin-top:10px;">
+                        <button type="button" class="btn btn-subdued" data-action="cancel" data-field="color">Cancel</button>
+                        <button type="button" class="btn btn-accent" data-action="save" data-field="color">Save</button>
+                    </div>
                 </div>
             </div>
             
-            <div style="margin-bottom: 25px; background: #f8fafc; padding: 20px; border-radius: var(--border-radius-md); border: 2px solid #e2e8f0; display: none;" id="view-desc-container">
+            <div style="margin-bottom: 25px; position: relative; background: #f8fafc; padding: 20px; border-radius: var(--border-radius-md); border: 2px solid #e2e8f0; display: none;" id="view-desc-container">
                 <div style="font-size: 14px; color: var(--text-muted); text-transform: uppercase; font-weight: 800; margin-bottom: 8px;">Details</div>
                 <p id="view-desc" style="color: var(--text-main); font-size: 18px; white-space: pre-wrap; line-height: 1.6;"></p>
+                <textarea id="view-details-input" rows="4" style="display:none; width:100%; padding: 12px 14px; border: 2px solid #e2e8f0; border-radius: 12px; background:#fff; font-size: 16px; line-height: 1.6;"></textarea>
+                <button type="button" class="view-inline-edit-btn" data-field="details" aria-label="Edit details" style="display:none; position:absolute; right: 14px; margin-top: -42px; background:transparent; border:none; cursor:pointer; padding:6px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"></path></svg>
+                </button>
+                <div id="view-details-actions" style="display:none; justify-content:flex-end; gap:10px; margin-top:10px;">
+                    <button type="button" class="btn btn-subdued" data-action="cancel" data-field="details">Cancel</button>
+                    <button type="button" class="btn btn-accent" data-action="save" data-field="details">Save</button>
+                </div>
             </div>
 
 
@@ -439,6 +652,37 @@
                 <button class="btn btn-accent btn-sm" id="btn-add-from-day" style="padding: 8px 16px; font-size: 12px; border-radius: 50px;">+ Add Schedule</button>
             </div>
             <div id="day-events-list"></div>
+        </div>
+    </div>
+
+    <!-- Edit single day (full details) within a schedule -->
+    <div class="modal-overlay" id="edit-day-modal">
+        <div class="modal-content" style="max-width: 480px;">
+            <div class="modal-header">
+                <h2 id="edit-day-modal-title">Edit day details</h2>
+            </div>
+            <input type="hidden" id="edit-day-event-id">
+            <input type="hidden" id="edit-day-date">
+            <div class="form-group">
+                <label for="edit-day-title">Schedule Title</label>
+                <input type="text" id="edit-day-title" placeholder="Title for this day">
+            </div>
+            <div class="form-group">
+                <label for="edit-day-location">Location</label>
+                <input type="text" id="edit-day-location" placeholder="Location for this day">
+            </div>
+            <div class="form-group">
+                <label for="edit-day-classification">Classification of Clients</label>
+                <input type="text" id="edit-day-classification" placeholder="Classification for this day">
+            </div>
+            <div class="form-group">
+                <label for="edit-day-desc">Details (optional)</label>
+                <textarea id="edit-day-desc" rows="3" placeholder="Details for this day"></textarea>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 15px; margin-top: 20px;">
+                <button type="button" class="btn" style="background: transparent; color: var(--text-muted);" onclick="closeModal('edit-day-modal')">Cancel</button>
+                <button type="button" class="btn btn-accent" id="edit-day-save">Save</button>
+            </div>
         </div>
     </div>
 

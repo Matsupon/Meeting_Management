@@ -31,25 +31,29 @@ class EventController extends Controller
             if (!$event) {
                 return response()->json(['status' => 'error', 'message' => 'Event not found'], 404);
             }
-            $event->title       = $input['title']       ?? $event->title;
-            $event->date        = $input['date']        ?? $event->date;
-            $event->end_date    = $input['end_date']    ?? $event->end_date;
-            $event->time        = $input['time']        ?? $event->time;
-            $event->description = $input['description'] ?? $event->description;
-            $event->status      = $input['status']      ?? $event->status;
-            $event->color       = $input['color']       ?? $event->color;
+            $event->title          = $input['title']          ?? $event->title;
+            $event->date           = $input['date']           ?? $event->date;
+            $event->end_date       = $input['end_date']       ?? $event->end_date;
+            $event->location       = $input['location']       ?? $event->location;
+            $event->classification = $input['classification'] ?? $event->classification;
+            $event->description   = $input['description']    ?? $event->description;
+            $event->status         = $input['status']         ?? $event->status;
+            $event->color          = $input['color']          ?? $event->color;
+            $event->day_overrides  = array_key_exists('day_overrides', $input) ? $input['day_overrides'] : $event->day_overrides;
             $event->save();
         } else {
             // Create
             Event::create([
-                'id'          => (string) Str::uuid(),
-                'title'       => $input['title']       ?? '',
-                'date'        => $input['date']        ?? '',
-                'end_date'    => $input['end_date']    ?? null,
-                'time'        => $input['time']        ?? '',
-                'description' => $input['description'] ?? '',
-                'status'      => $input['status']      ?? 'upcoming',
-                'color'       => $input['color']       ?? '#3b82f6',
+                'id'             => (string) Str::uuid(),
+                'title'          => $input['title']       ?? '',
+                'date'           => $input['date']        ?? '',
+                'end_date'       => $input['end_date']    ?? null,
+                'location'       => $input['location']     ?? null,
+                'classification' => $input['classification'] ?? null,
+                'description'    => $input['description'] ?? '',
+                'status'         => $input['status']       ?? 'upcoming',
+                'color'          => $input['color']       ?? '#3b82f6',
+                'day_overrides'  => $input['day_overrides'] ?? null,
             ]);
         }
 

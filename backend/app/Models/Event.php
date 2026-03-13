@@ -12,9 +12,16 @@ class Event extends Model
         'date',
         'end_date',
         'time',
+        'location',
+        'classification',
         'description',
         'status',
-        'color'
+        'color',
+        'day_overrides',
+    ];
+
+    protected $casts = [
+        'day_overrides' => 'array',
     ];
     
     // Disable auto-incrementing since we use string IDs from the frontend

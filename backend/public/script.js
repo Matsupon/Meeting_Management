@@ -14,7 +14,6 @@ const eventModal = document.getElementById('event-modal');
 const viewModal = document.getElementById('view-modal');
 const eventForm = document.getElementById('event-form');
 const eventListContainer = document.getElementById('event-list-container');
-const timeSelect = document.getElementById('event-time');
 const searchInput = document.getElementById('search-input');
 const filterTimeDropdown = document.getElementById('filter-time-dropdown');
 const statusChips = document.querySelectorAll('#status-filters .chip');
@@ -22,10 +21,12 @@ const selectedDayOption = document.getElementById('selected-day-option');
 const monthFilterDropdown = document.getElementById('month-filter');
 let activeStatusFilter = 'all';
 let countdownInterval = null;
+let currentViewContext = { eventId: null, date: null };
+let currentViewOriginal = {};
+let viewEditMode = false;
 
 // Initialization
 document.addEventListener('DOMContentLoaded', () => {
-    generateTimeOptions();
     fetchEvents();
 
     // Close modal on click outside or ESC
@@ -85,12 +86,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const dateEls = ['event-date', 'event-end-date', 'edit-event-date', 'edit-event-end-date'];
-    dateEls.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.addEventListener('change', updateTimeAvailability);
-    });
-
     // Sidebar Push Logic
     const hamburgerMenu = document.getElementById('hamburger-menu');
     const sidebar = document.getElementById('sidebar-main');
@@ -134,18 +129,268 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Initial check for reminders after a short delay to ensure UI is ready
-    setTimeout(checkUpcomingReminders, 1000);
+    // Edit day (per-day details) save
+    const editDaySave = document.getElementById('edit-day-save');
+    if (editDaySave) {
+        editDaySave.addEventListener('click', saveEditDay);
+    }
 
+    // Schedule color picker dropdown
+    const colorTrigger = document.getElementById('event-color-trigger');
+    const colorDropdown = document.getElementById('event-color-dropdown');
+    const colorValueInput = document.getElementById('event-color-value');
+    const colorTriggerName = document.getElementById('event-color-trigger-name');
+    const colorTriggerSwatch = document.getElementById('event-color-trigger-swatch');
+    if (colorTrigger && colorDropdown) {
+        colorTrigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            colorDropdown.classList.toggle('open');
+            colorTrigger.setAttribute('aria-expanded', colorDropdown.classList.contains('open'));
+        });
+        document.querySelectorAll('#event-color-dropdown .color-picker-option').forEach(opt => {
+            opt.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const hex = opt.getAttribute('data-hex');
+                const name = opt.getAttribute('data-name');
+                if (colorValueInput) colorValueInput.value = hex;
+                if (colorTriggerName) colorTriggerName.textContent = name;
+                if (colorTriggerSwatch) colorTriggerSwatch.style.background = hex;
+                colorDropdown.classList.remove('open');
+                colorTrigger.setAttribute('aria-expanded', 'false');
+            });
+        });
+        document.addEventListener('click', () => {
+            colorDropdown.classList.remove('open');
+            colorTrigger.setAttribute('aria-expanded', 'false');
+        });
+    }
+
+    setTimeout(checkUpcomingReminders, 1000);
 });
 
-function formatTimeToAmer(timeStr) {
-    if (!timeStr) return '';
-    const [h, m] = timeStr.split(':');
-    const hours = parseInt(h, 10);
-    const suffix = hours >= 12 ? 'PM' : 'AM';
-    const ampmHours = hours % 12 || 12;
-    return `${ampmHours}:${m} ${suffix}`;
+// Schedule color picker: warm palette (no red). Map legacy hex to new default.
+const SCHEDULE_COLORS = [
+    { hex: '#93c5fd', name: 'Soft Blue' },
+    { hex: '#fdba74', name: 'Peach' },
+    { hex: '#86efac', name: 'Sage' },
+    { hex: '#fcd34d', name: 'Amber' },
+    { hex: '#c4b5fd', name: 'Warm Violet' },
+    { hex: '#fb923c', name: 'Orange' },
+    { hex: '#fef3c7', name: 'Cream' },
+    { hex: '#f9a8d4', name: 'Rose' },
+    { hex: '#5eead4', name: 'Mint' },
+    { hex: '#d1d5db', name: 'Warm Gray' }
+];
+const LEGACY_COLOR_MAP = {
+    '#bfdbfe': '#93c5fd', '#fecaca': '#fdba74', '#bbf7d0': '#86efac', '#fde68a': '#fcd34d',
+    '#e9d5ff': '#c4b5fd', '#fed7aa': '#fb923c', '#cffafe': '#5eead4', '#99f6e4': '#5eead4',
+    '#e5e7eb': '#d1d5db', '#f9a8d4': '#f9a8d4'
+};
+function getEventColorName(hex) {
+    if (!hex) return 'Soft Blue';
+    const normalized = LEGACY_COLOR_MAP[hex] || hex;
+    const found = SCHEDULE_COLORS.find(c => c.hex === normalized);
+    return found ? found.name : SCHEDULE_COLORS[0].name;
+}
+function setEventColorPicker(hex, name) {
+    const norm = LEGACY_COLOR_MAP[hex] || hex;
+    const val = document.getElementById('event-color-value');
+    const triggerName = document.getElementById('event-color-trigger-name');
+    const triggerSwatch = document.getElementById('event-color-trigger-swatch');
+    if (val) val.value = norm;
+    if (triggerName) triggerName.textContent = name || getEventColorName(hex);
+    if (triggerSwatch) triggerSwatch.style.background = norm;
+}
+
+function normalizeScheduleColor(hex) {
+    return LEGACY_COLOR_MAP[hex] || hex || SCHEDULE_COLORS[0].hex;
+}
+
+function setViewInlineMode(field, isEditing) {
+    const actions = document.getElementById(`view-${field}-actions`);
+    const editBtn = document.querySelector(`.view-inline-edit-btn[data-field="${field}"]`);
+    if (actions) actions.style.display = isEditing ? 'flex' : 'none';
+    if (editBtn) editBtn.style.display = isEditing ? 'none' : 'inline-flex';
+}
+
+async function saveViewField(field) {
+    const e = events.find(ev => ev.id === currentViewContext.eventId);
+    if (!e) return;
+    const ctxDate = currentViewContext.date || e.date;
+    const isMultiDay = e.end_date && e.end_date !== e.date;
+    const applyToDay = isMultiDay && ctxDate && ctxDate !== e.date && field !== 'date' && field !== 'color';
+
+    const next = { ...e };
+    const day_overrides = { ...(e.day_overrides || {}) };
+    const day = { ...(day_overrides[ctxDate] || {}) };
+
+    if (field === 'title') {
+        const val = (document.getElementById('view-title-input')?.value || '').trim();
+        if (applyToDay) day.title = val || null;
+        else next.title = val || next.title;
+    }
+    if (field === 'location') {
+        const val = (document.getElementById('view-location-input')?.value || '').trim();
+        if (applyToDay) day.location = val || null;
+        else next.location = val || null;
+    }
+    if (field === 'classification') {
+        const val = (document.getElementById('view-classification-input')?.value || '').trim();
+        if (applyToDay) day.classification = val || null;
+        else next.classification = val || null;
+    }
+    if (field === 'date') {
+        const startVal = document.getElementById('view-date-start-input')?.value || '';
+        const endVal = document.getElementById('view-date-end-input')?.value || '';
+        next.date = startVal || next.date;
+        next.end_date = endVal || null;
+    }
+    if (field === 'color') {
+        const selected = currentViewOriginal.color || next.color;
+        next.color = normalizeScheduleColor(selected);
+    }
+    if (field === 'details') {
+        const val = (document.getElementById('view-details-input')?.value || '').trim();
+        if (applyToDay) day.description = val || null;
+        else next.description = val || '';
+    }
+
+    if (applyToDay) {
+        day_overrides[ctxDate] = day;
+        next.day_overrides = day_overrides;
+    } else if (isMultiDay && ctxDate && field !== 'date' && field !== 'color') {
+        // If editing the start day, treat it as schedule-level update (default details)
+        next.day_overrides = day_overrides;
+    }
+
+    try {
+        const res = await fetch(API_BASE, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id: next.id,
+                title: next.title,
+                date: next.date,
+                end_date: next.end_date,
+                location: next.location,
+                classification: next.classification,
+                description: next.description,
+                status: next.status,
+                color: next.color,
+                day_overrides: next.day_overrides
+            })
+        });
+        const result = await res.json();
+        if (result.status === 'success') {
+            Swal.fire({
+                title: 'Updated successfully!',
+                icon: 'success',
+                toast: true,
+                position: 'top',
+                showConfirmButton: false,
+                timer: 1500,
+                timerProgressBar: true
+            });
+            // Exit edit mode after save
+            viewEditMode = false;
+            const editDetailsBtn = document.getElementById('btn-edit-view');
+            if (editDetailsBtn) {
+                editDetailsBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> Edit Details`;
+            }
+            updateViewEditModeUI();
+            await fetchEvents();
+            openViewModal(next.id, ctxDate);
+        } else {
+            Swal.fire('Error!', 'Failed to update schedule', 'error');
+        }
+    } catch (err) {
+        console.error(err);
+        Swal.fire('Error!', 'Server Error', 'error');
+    }
+}
+
+function cancelViewField(field) {
+    // restore original values in inputs and hide edit UI
+    if (field === 'title') {
+        const input = document.getElementById('view-title-input');
+        const span = document.getElementById('view-title-text');
+        if (input) input.value = currentViewOriginal.title || '';
+        if (span) span.style.display = '';
+        if (input) input.style.display = 'none';
+    }
+    if (field === 'location') {
+        const input = document.getElementById('view-location-input');
+        const span = document.getElementById('view-location');
+        if (input) input.value = currentViewOriginal.location || '';
+        if (span) span.style.display = '';
+        if (input) input.style.display = 'none';
+    }
+    if (field === 'classification') {
+        const input = document.getElementById('view-classification-input');
+        const span = document.getElementById('view-classification');
+        if (input) input.value = currentViewOriginal.classification || '';
+        if (span) span.style.display = '';
+        if (input) input.style.display = 'none';
+    }
+    if (field === 'date') {
+        const edit = document.getElementById('view-date-edit');
+        if (edit) edit.style.display = 'none';
+    }
+    if (field === 'color') {
+        const palette = document.getElementById('view-color-palette');
+        if (palette) palette.style.display = 'none';
+    }
+    if (field === 'details') {
+        const input = document.getElementById('view-details-input');
+        const span = document.getElementById('view-desc');
+        if (input) input.value = currentViewOriginal.details || '';
+        if (span) span.style.display = '';
+        if (input) input.style.display = 'none';
+    }
+    setViewInlineMode(field, false);
+}
+
+function startViewField(field) {
+    // only one field at a time
+    ['title','location','classification','date','color','details'].forEach(f => { if (f !== field) cancelViewField(f); });
+
+    if (field === 'title') {
+        const input = document.getElementById('view-title-input');
+        const span = document.getElementById('view-title-text');
+        if (span) span.style.display = 'none';
+        if (input) { input.style.display = 'inline-flex'; input.value = currentViewOriginal.title || ''; input.focus(); }
+    }
+    if (field === 'location') {
+        const input = document.getElementById('view-location-input');
+        const span = document.getElementById('view-location');
+        if (span) span.style.display = 'none';
+        if (input) { input.style.display = 'inline-flex'; input.value = currentViewOriginal.location || ''; input.focus(); }
+    }
+    if (field === 'classification') {
+        const input = document.getElementById('view-classification-input');
+        const span = document.getElementById('view-classification');
+        if (span) span.style.display = 'none';
+        if (input) { input.style.display = 'inline-flex'; input.value = currentViewOriginal.classification || ''; input.focus(); }
+    }
+    if (field === 'date') {
+        const edit = document.getElementById('view-date-edit');
+        const start = document.getElementById('view-date-start-input');
+        const end = document.getElementById('view-date-end-input');
+        if (edit) edit.style.display = 'flex';
+        if (start) start.value = currentViewOriginal.date || '';
+        if (end) end.value = currentViewOriginal.end_date || '';
+    }
+    if (field === 'color') {
+        const palette = document.getElementById('view-color-palette');
+        if (palette) palette.style.display = 'flex';
+    }
+    if (field === 'details') {
+        const input = document.getElementById('view-details-input');
+        const span = document.getElementById('view-desc');
+        if (span) span.style.display = 'none';
+        if (input) { input.style.display = 'block'; input.value = currentViewOriginal.details || ''; input.focus(); }
+    }
+    setViewInlineMode(field, true);
 }
 
 function getFullDateString(dateStr) {
@@ -193,7 +438,7 @@ async function fetchEvents() {
                 return { ...e, status };
             });
 
-            events.sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
+            events.sort((a, b) => new Date(a.date) - new Date(b.date));
             renderCalendar();
             renderEventList();
             updateBentoStats();
@@ -213,10 +458,10 @@ function getColorByDate(dateStr, status, endDateStr) {
 
     if (status === 'completed') return '#64748b'; // Gray for finished
     if (now >= start && now <= end && status === 'upcoming') return '#3b82f6'; // Blue for ongoing
-    
+
     if (daysUntil > 6) return '#22c55e'; // Green (More than 6 work days)
-    if (daysUntil >= 4) return '#eab308'; // Yellow/Orange (4, 5, or 6 days)
-    if (daysUntil <= 3) return '#ef4444'; // Red (Less than 4 days)
+    if (daysUntil >= 4) return '#eab308'; // Amber (4, 5, or 6 days)
+    if (daysUntil <= 3) return '#ea580c'; // Warm orange (soon), no red
     return '#22c55e';
 }
 
@@ -281,8 +526,8 @@ function renderCalendar() {
         // Gray only when date is strictly in the past AND every schedule on that day has passed or is finished (never gray today)
         const todayStr = new Date().toISOString().split('T')[0];
         const allSchedulesDone = dayEvents.length === 0 || dayEvents.every(e => {
-            const evtTime = new Date(`${e.date}T${e.time}:00`);
-            return e.status === 'completed' || evtTime < nowDateTime;
+            const evtEnd = e.end_date ? new Date(e.end_date + 'T00:00:00') : new Date(e.date + 'T00:00:00');
+            return e.status === 'completed' || evtEnd < now;
         });
         if (hasFinishedEvents) cell.classList.add('finished-day');
         if (cellDate !== todayStr && isPast && allSchedulesDone) cell.classList.add('past-no-finish');
@@ -300,8 +545,8 @@ function renderCalendar() {
         }
 
         const hasUpcomingOrFuture = dayEvents.some(e => {
-            const evtTime = new Date(`${e.date}T${e.time}:00`);
-            return e.status === 'upcoming' && evtTime > nowDateTime;
+            const evtEnd = e.end_date ? new Date(e.end_date + 'T00:00:00') : new Date(e.date + 'T00:00:00');
+            return e.status === 'upcoming' && evtEnd >= now;
         });
         if (!isPast || hasFinishedEvents || hasUpcomingOrFuture) {
             cell.addEventListener('click', () => {
@@ -331,14 +576,11 @@ function renderCalendar() {
                         const startObj = new Date(e.date + 'T00:00:00');
                         const endObj = e.end_date ? new Date(e.end_date + 'T00:00:00') : startObj;
                         const isMultiDay = e.end_date && e.end_date !== e.date;
-                        
-                        let dateDisplay = formatTimeToAmer(e.time);
-                        if (isMultiDay) {
-                            const mNamesShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-                            const startStr = `${mNamesShort[startObj.getMonth()]} ${startObj.getDate()}`;
-                            const endStr = `${mNamesShort[endObj.getMonth()]} ${endObj.getDate()}`;
-                            dateDisplay = `${startStr} - ${endStr} | ${dateDisplay}`;
-                        }
+                        const mNamesShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                        const startStr = `${mNamesShort[startObj.getMonth()]} ${startObj.getDate()}`;
+                        const dateDisplay = isMultiDay
+                            ? `${startStr} – ${mNamesShort[endObj.getMonth()]} ${endObj.getDate()}`
+                            : startStr;
 
                         card.innerHTML = `
                             <h3 style="font-size: 24px; font-weight: 700; color: var(--primary-blue); margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; display: flex; align-items: center; gap: 8px;">
@@ -346,11 +588,15 @@ function renderCalendar() {
                                 ${e.title}
                             </h3>
                             <div style="color: var(--text-muted); font-size: var(--font-size-base); display: flex; align-items: center; gap: 5px;">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
                                 ${dateDisplay}
                             </div>
                         `;
-                        card.onclick = () => { closeModal('day-events-modal'); openViewModal(e.id); };
+                        card.onclick = () => {
+                            closeModal('day-events-modal');
+                            // Always show full details first; allow editing the clicked day from the view modal
+                            openViewModal(e.id, cellDate);
+                        };
                         list.appendChild(card);
                     });
                     modal.classList.add('active');
@@ -444,8 +690,7 @@ function renderCalendar() {
     });
 
     function addEventBar(evt, gridRow, colStart, colEnd, laneIndex) {
-        let barColor = getColorByDate(evt.date, evt.status, evt.end_date);
-        const evtDateTime = new Date(`${evt.date}T${evt.time}:00`);
+        const barColor = evt.color || getColorByDate(evt.date, evt.status, evt.end_date);
         const bar = document.createElement('div');
         bar.className = 'calendar-event-bar';
         bar.style.setProperty('--bar-row', gridRow);
@@ -487,124 +732,41 @@ function updateBentoStats() {
         }
     });
 
-    document.getElementById('stats-month').textContent = monthCount;
+    const statsEl = document.getElementById('stats-month');
+    if (statsEl) statsEl.textContent = monthCount;
 }
 
 function updateNextMeeting() {
     if (countdownInterval) clearInterval(countdownInterval);
     const bento = document.getElementById('next-meeting-bento');
+    if (!bento) return;
 
     const now = new Date();
+    now.setHours(0, 0, 0, 0);
     const upcomingEvents = events.filter(e => {
         if (e.status !== 'upcoming') return false;
-        const evtTime = new Date(`${e.date}T${e.time}:00`);
-        return evtTime > now;
-    });
+        const evtEnd = e.end_date ? new Date(e.end_date + 'T00:00:00') : new Date(e.date + 'T00:00:00');
+        return evtEnd >= now;
+    }).sort((a, b) => new Date(a.date) - new Date(b.date));
 
     if (upcomingEvents.length === 0) {
         bento.innerHTML = `
-            <h3 style="color: var(--primary-blue); font-size: 14px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 5px;">NEXT MEETING</h3>
-            <div style="font-size: 20px; font-weight: 700; color: var(--text-muted); line-height: 1.2; text-align: center;">No upcoming meetings</div>
+            <h3 style="color: var(--primary-blue); font-size: 14px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 5px;">NEXT SCHEDULE</h3>
+            <div style="font-size: 20px; font-weight: 700; color: var(--text-muted); line-height: 1.2; text-align: center;">No upcoming schedules</div>
         `;
         return;
     }
 
     const nextEvent = upcomingEvents[0];
-    const targetTime = new Date(`${nextEvent.date}T${nextEvent.time}:00`).getTime();
+    const startDate = new Date(nextEvent.date + 'T00:00:00');
+    const daysLeft = Math.ceil((startDate - now) / (1000 * 60 * 60 * 24));
+    const timeStr = daysLeft <= 0 ? 'Today' : (daysLeft === 1 ? '1 day' : `${daysLeft} days`);
 
-    const updateCountdown = () => {
-        const currentTime = new Date().getTime();
-        const diff = targetTime - currentTime;
-
-        if (diff <= 0) {
-            clearInterval(countdownInterval);
-            fetchEvents(); // Re-fetch to update states
-            return;
-        }
-
-        const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const hours = Math.floor(diff / (1000 * 60 * 60));
-
-        let timeStr = `${mins} mins`;
-        if (hours > 0) timeStr = `${hours}h ${mins}m`;
-        if (hours > 24) {
-            const days = Math.floor(hours / 24);
-            timeStr = `${days} days`;
-        }
-
-        bento.innerHTML = `
-            <h3 style="color: var(--primary-blue); font-size: 14px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 5px;">NEXT MEETING</h3>
-            <div style="color: #ef4444; font-weight: 600; font-size: 16px; margin-bottom: 5px;">Starts in ${timeStr}</div>
-            <div style="font-size: 24px; font-weight: 700; color: var(--text-main); line-height: 1.2; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; cursor: pointer;" onclick="openViewModal('${nextEvent.id}')">${nextEvent.title}</div>
-        `;
-    };
-
-    updateCountdown();
-    countdownInterval = setInterval(updateCountdown, 60000); // Update every minute
-}
-
-function generateTimeOptions() {
-    timeSelect.innerHTML = '';
-    // Restrict from 8:00 AM to 8:00 PM to keep dropdown shorter
-    for (let i = 8; i <= 20; i++) {
-        for (let m of ['00', '30']) {
-            if (i === 20 && m === '30') continue;
-            const val = `${String(i).padStart(2, '0')}:${m}`;
-            const opt = document.createElement('option');
-            opt.value = val;
-            opt.textContent = formatTimeToAmer(val);
-            timeSelect.appendChild(opt);
-        }
-    }
-}
-
-function updateTimeAvailability() {
-    const selectedDateStr = document.getElementById('event-date').value;
-    const endDateStr = document.getElementById('event-end-date').value || selectedDateStr;
-    const currentEventId = document.getElementById('event-id').value;
-    
-    if (!selectedDateStr) return;
-
-    const startDate = new Date(selectedDateStr + 'T00:00:00');
-    const endDate = new Date(endDateStr + 'T00:00:00');
-    
-    // Check for collisions across the proposed range (startDate to endDate)
-    const existingTimes = {};
-    events.forEach(e => {
-        if (e.id !== String(currentEventId) && e.status !== 'cancelled') {
-            const bookedStart = new Date(e.date + 'T00:00:00');
-            const bookedEnd = e.end_date ? new Date(e.end_date + 'T00:00:00') : bookedStart;
-            
-            // Check if there's any overlap between [startDate, endDate] and [bookedStart, bookedEnd]
-            if (startDate <= bookedEnd && endDate >= bookedStart) {
-                existingTimes[e.time] = e.title;
-            }
-        }
-    });
-
-    Array.from(timeSelect.options).forEach(opt => {
-        const baseAmPm = formatTimeToAmer(opt.value);
-        if (existingTimes[opt.value]) {
-            opt.disabled = true;
-            let bookedStr = existingTimes[opt.value];
-            if (bookedStr.length > 15) {
-                bookedStr = bookedStr.substring(0, 15) + '...';
-            }
-            opt.textContent = `${baseAmPm} - (Booked: ${bookedStr})`;
-            opt.style.color = '#94a3b8';
-            opt.style.background = '#f1f5f9';
-        } else {
-            opt.disabled = false;
-            opt.textContent = baseAmPm;
-            opt.style.color = '';
-            opt.style.background = '';
-        }
-    });
-
-    if (timeSelect.options[timeSelect.selectedIndex]?.disabled) {
-        const firstAvailable = Array.from(timeSelect.options).find(o => !o.disabled);
-        if (firstAvailable) timeSelect.value = firstAvailable.value;
-    }
+    bento.innerHTML = `
+        <h3 style="color: var(--primary-blue); font-size: 14px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 5px;">NEXT SCHEDULE</h3>
+        <div style="color: #ef4444; font-weight: 600; font-size: 16px; margin-bottom: 5px;">Starts in ${timeStr}</div>
+        <div style="font-size: 24px; font-weight: 700; color: var(--text-main); line-height: 1.2; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; cursor: pointer;" onclick="openViewModal('${nextEvent.id}')">${nextEvent.title}</div>
+    `;
 }
 
 function renderEventList() {
@@ -716,7 +878,7 @@ function renderEventList() {
         const itemColor = getColorByDate(e.date, e.status, e.end_date);
         let statusColorClass = 'status-green';
         if (itemColor === '#eab308') statusColorClass = 'status-yellow';
-        if (itemColor === '#ef4444') statusColorClass = 'status-red';
+        if (itemColor === '#ea580c') statusColorClass = 'status-amber'; // Soon (warm orange)
         if (itemColor === '#3b82f6') {
             statusColorClass = 'status-blue'; // Ongoing
         } else if (itemColor === '#64748b') {
@@ -757,9 +919,15 @@ function renderEventList() {
             daysLeftLabel = '';
         }
 
+        const dateRangeLabel = (!e.end_date || e.end_date === e.date)
+            ? `${monthStr} ${dayOfMonth}`
+            : (endObj && endObj.getMonth() === dObj.getMonth())
+                ? `${monthStr} ${dayOfMonth}–${endDayOfMonth}`
+                : `${monthStr} ${dayOfMonth} – ${endMonthStr} ${endDayOfMonth}`;
+
         row.innerHTML = `
             <div class="status-line ${statusColorClass}"></div>
-            <div class="status-pill ${pillClass}">${statusLabel}</div>
+            <div style="position: absolute; right: 16px; top: 10px; font-size: 15px; font-weight: 700; color: ${itemColor};">${daysLeftLabel}</div>
             <div style="display: flex; align-items: center; gap: 15px; flex: 1; pointer-events: none; min-width: 0;">
                 <div style="background: var(--primary-blue); color: white; border-radius: 8px; padding: 10px 10px; text-align: center; min-width: 78px; flex-shrink: 0;">
                     ${dateBadgeHtml}
@@ -768,13 +936,13 @@ function renderEventList() {
                     <h3 class="${titleClass}" style="font-size: 17px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;">${e.title}</h3>
                     <div style="display: flex; gap: 10px; color: var(--text-muted); font-size: 16px; font-weight: 500;">
                         <span style="display: flex; align-items: center; gap: 3px;">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                            ${formatTimeToAmer(e.time)}
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                            ${dateRangeLabel}
                         </span>
                     </div>
                 </div>
             </div>
-            <div style="position: absolute; right: 16px; bottom: 10px; font-size: 16px; font-weight: 700; color: var(--text-main); opacity: 0.75;">${daysLeftLabel}</div>
+            <div class="status-pill ${pillClass}" style="position: absolute; right: 16px; bottom: 10px;">${statusLabel}</div>
         `;
 
         row.onclick = () => openViewModal(e.id);
@@ -787,12 +955,16 @@ function openModal(mode, eventId) {
     document.getElementById('event-form').reset();
     document.getElementById('event-id').value = '';
 
+    const locEl = document.getElementById('event-location');
+    const classEl = document.getElementById('event-classification');
+
     if (mode === 'add') {
         document.getElementById('modal-title').textContent = 'Add New Schedule';
         document.getElementById('event-date').value = selectedFilterDate || new Date().toISOString().split('T')[0];
         document.getElementById('status-group').style.display = 'none';
+        setEventColorPicker('#93c5fd', 'Soft Blue');
     } else if (mode === 'edit') {
-        document.getElementById('modal-title').textContent = 'Edit Event';
+        document.getElementById('modal-title').textContent = 'Edit Schedule';
         document.getElementById('status-group').style.display = 'block';
         const e = events.find(ev => ev.id === eventId);
         if (e) {
@@ -800,71 +972,243 @@ function openModal(mode, eventId) {
             document.getElementById('event-title').value = e.title;
             document.getElementById('event-date').value = e.date;
             document.getElementById('event-end-date').value = e.end_date || '';
-            document.getElementById('event-desc').value = e.description;
+            if (locEl) locEl.value = e.location || '';
+            if (classEl) classEl.value = e.classification || '';
+            document.getElementById('event-desc').value = e.description || '';
             document.getElementById('event-status').value = e.status || 'upcoming';
-            updateTimeAvailability();
-            timeSelect.value = e.time;
+            setEventColorPicker(e.color || '#93c5fd', getEventColorName(e.color));
         }
     }
-    
-    updateTimeAvailability();
-    eventModal.classList.add('active');
-    document.getElementById('event-title').focus();
+
+    if (eventModal) eventModal.classList.add('active');
+    const focusEl = document.getElementById('event-title');
+    if (focusEl) focusEl.focus();
 }
 
-function openViewModal(eventId) {
+function openViewModal(eventId, dateContext) {
     const e = events.find(ev => ev.id === eventId);
     if (!e) return;
+    if (!viewModal) return;
 
-    document.getElementById('view-title').textContent = e.title;
+    const ctxDate = dateContext || e.date;
+    const overrides = (e.day_overrides && e.day_overrides[ctxDate]) ? e.day_overrides[ctxDate] : {};
+    const effTitle = overrides.title || e.title;
+    const effLocation = overrides.location || e.location;
+    const effClassification = overrides.classification || e.classification;
+    const effDescription = (overrides.description !== undefined && overrides.description !== null)
+        ? overrides.description
+        : (ctxDate === e.date ? e.description : '');
 
-    // Display full duration if end_date exists
+    currentViewContext = { eventId: e.id, date: ctxDate };
+    currentViewOriginal = {
+        title: effTitle || '',
+        location: (overrides.location || e.location) || '',
+        classification: (overrides.classification || e.classification) || '',
+        date: e.date || '',
+        end_date: e.end_date || '',
+        color: normalizeScheduleColor(e.color || '#93c5fd'),
+        details: effDescription || '',
+    };
+
+    const viewTitle = document.getElementById('view-title');
+    const viewTitleText = document.getElementById('view-title-text');
+    if (viewTitle) viewTitle.textContent = effTitle;
+    if (viewTitleText) viewTitleText.textContent = effTitle;
+    const titleInput = document.getElementById('view-title-input');
+    if (titleInput) titleInput.value = effTitle || '';
+
     const dateText = e.end_date && e.end_date !== e.date
-        ? `${getFullDateString(e.date)} - ${getFullDateString(e.end_date)}`
+        ? `${getFullDateString(e.date)} – ${getFullDateString(e.end_date)}`
         : getFullDateString(e.date);
+    const viewDate = document.getElementById('view-date');
+    if (viewDate) viewDate.textContent = dateText;
 
-    document.getElementById('view-date').textContent = dateText;
-    document.getElementById('view-time').textContent = formatTimeToAmer(e.time);
+    const viewLocation = document.getElementById('view-location');
+    const viewClassification = document.getElementById('view-classification');
+    if (viewLocation) viewLocation.textContent = effLocation || '—';
+    if (viewClassification) viewClassification.textContent = effClassification || '—';
+
+    const viewColorName = document.getElementById('view-color-name');
+    const viewColorSwatch = document.getElementById('view-color-swatch');
+    const cHex = normalizeScheduleColor(e.color || '#93c5fd');
+    if (viewColorName) viewColorName.textContent = getEventColorName(cHex);
+    if (viewColorSwatch) viewColorSwatch.style.background = cHex;
+
+    // reset any open editors
+    ['title','location','classification','date','color','details'].forEach(cancelViewField);
+    viewEditMode = false;
+    updateViewEditModeUI();
 
     const cancelBtn = document.getElementById('btn-cancel-meeting');
     const editBtn = document.getElementById('btn-edit-view');
     const deleteBtn = document.getElementById('btn-delete-view');
-
-    // Action buttons visibility rules:
-    // - completed: hide edit/cancel (but allow delete)
-    // - cancelled: hide cancel (but allow edit + delete)
-    // - upcoming: show all
     if (cancelBtn) cancelBtn.style.display = (e.status === 'upcoming') ? 'inline-flex' : 'none';
     if (editBtn) editBtn.style.display = (e.status === 'completed') ? 'none' : 'inline-flex';
     if (deleteBtn) deleteBtn.style.display = 'inline-flex';
 
     const descCon = document.getElementById('view-desc-container');
     const descEl = document.getElementById('view-desc');
-    if (e.description && e.description.trim() !== '') {
-        descEl.textContent = e.description;
-        descCon.style.display = 'block';
-    } else {
-        descCon.style.display = 'none';
+    if (descCon && descEl) {
+        if (effDescription && String(effDescription).trim() !== '') {
+            descEl.textContent = effDescription;
+            descCon.style.display = 'block';
+        } else {
+            descCon.style.display = 'none';
+        }
     }
+    const detailsInput = document.getElementById('view-details-input');
+    if (detailsInput) detailsInput.value = currentViewOriginal.details || '';
 
-    const editViewBtn = document.getElementById('btn-edit-view');
-    if (editViewBtn) editViewBtn.onclick = () => {
-        closeModal('view-modal');
-        setTimeout(() => openModal('edit', e.id), 150);
-    };
+    // wire inline edit buttons/actions (idempotent via onclick assignment)
+    document.querySelectorAll('.view-inline-edit-btn').forEach(btn => {
+        btn.onclick = (ev) => {
+            ev.stopPropagation();
+            if (!viewEditMode) return;
+            startViewField(btn.getAttribute('data-field'));
+        };
+    });
+    document.querySelectorAll('[data-action="save"][data-field]').forEach(btn => {
+        btn.onclick = (ev) => {
+            ev.stopPropagation();
+            saveViewField(btn.getAttribute('data-field'));
+        };
+    });
+    document.querySelectorAll('[data-action="cancel"][data-field]').forEach(btn => {
+        btn.onclick = (ev) => {
+            ev.stopPropagation();
+            cancelViewField(btn.getAttribute('data-field'));
+        };
+    });
+    document.querySelectorAll('.view-color-rect').forEach(btn => {
+        btn.onclick = (ev) => {
+            ev.stopPropagation();
+            currentViewOriginal.color = normalizeScheduleColor(btn.getAttribute('data-hex'));
+            const sw = document.getElementById('view-color-swatch');
+            const nm = document.getElementById('view-color-name');
+            if (sw) sw.style.background = currentViewOriginal.color;
+            if (nm) nm.textContent = getEventColorName(currentViewOriginal.color);
+        };
+    });
 
+    const editDetailsBtn = document.getElementById('btn-edit-view');
+    if (editDetailsBtn) {
+        editDetailsBtn.onclick = (ev) => {
+            ev.stopPropagation();
+            viewEditMode = !viewEditMode;
+            // leaving edit mode should close any active field editors
+            if (!viewEditMode) {
+                ['title','location','classification','date','color','details'].forEach(cancelViewField);
+            }
+            updateViewEditModeUI();
+            // Keep the button label the same; edit icons indicate mode.
+            editDetailsBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> Edit Details`;
+        };
+    }
     if (cancelBtn) cancelBtn.onclick = () => {
-        cancelMeeting(e.id);
-        closeModal('view-modal');
+        Swal.fire({
+            title: 'Cancel Schedule?',
+            text: 'This will mark the schedule as cancelled.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#fb923c',
+            cancelButtonColor: '#94a3b8',
+            confirmButtonText: 'Yes, cancel it'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                cancelMeeting(e.id);
+            }
+        });
     };
-
     const deleteViewBtn = document.getElementById('btn-delete-view');
     if (deleteViewBtn) deleteViewBtn.onclick = () => {
-        closeModal('view-modal');
-        setTimeout(() => deleteEvent(e.id), 150);
+        Swal.fire({
+            title: 'Delete Schedule?',
+            text: 'This cannot be undone.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#fb923c',
+            cancelButtonColor: '#94a3b8',
+            confirmButtonText: 'Yes, delete it'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                closeModal('view-modal');
+                setTimeout(() => deleteEvent(e.id), 150);
+            }
+        });
     };
 
     viewModal.classList.add('active');
+}
+
+function updateViewEditModeUI() {
+    document.querySelectorAll('.view-inline-edit-btn').forEach(btn => {
+        btn.style.display = viewEditMode ? 'inline-flex' : 'none';
+    });
+}
+
+function openEditDayModal(eventId, dateStr) {
+    const e = events.find(ev => ev.id === eventId);
+    if (!e) return;
+    const dayOverrides = e.day_overrides || {};
+    const override = dayOverrides[dateStr] || {};
+    document.getElementById('edit-day-event-id').value = eventId;
+    document.getElementById('edit-day-date').value = dateStr;
+    document.getElementById('edit-day-modal-title').textContent = `Edit details for ${getFullDateString(dateStr)}`;
+    const titleEl = document.getElementById('edit-day-title');
+    const classEl = document.getElementById('edit-day-classification');
+    if (titleEl) titleEl.value = override.title || e.title || '';
+    document.getElementById('edit-day-location').value = override.location || e.location || '';
+    if (classEl) classEl.value = override.classification || e.classification || '';
+    document.getElementById('edit-day-desc').value = (override.description !== undefined && override.description !== null)
+        ? override.description
+        : (dateStr === e.date ? e.description || '' : '');
+    document.getElementById('edit-day-modal').classList.add('active');
+}
+
+async function saveEditDay() {
+    const eventId = document.getElementById('edit-day-event-id').value;
+    const dateStr = document.getElementById('edit-day-date').value;
+    const titleEl = document.getElementById('edit-day-title');
+    const location = document.getElementById('edit-day-location').value.trim();
+    const classEl = document.getElementById('edit-day-classification');
+    const description = document.getElementById('edit-day-desc').value.trim();
+    const e = events.find(ev => ev.id === eventId);
+    if (!e) return;
+
+    const dayOverrides = { ...(e.day_overrides || {}) };
+    dayOverrides[dateStr] = {
+        title: titleEl ? (titleEl.value.trim() || null) : null,
+        location: location || null,
+        classification: classEl ? (classEl.value.trim() || null) : null,
+        description: description || null
+    };
+
+    try {
+        const res = await fetch(API_BASE, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id: e.id,
+                title: e.title,
+                date: e.date,
+                end_date: e.end_date,
+                location: e.location,
+                classification: e.classification,
+                description: e.description,
+                status: e.status,
+                color: e.color,
+                day_overrides: dayOverrides
+            })
+        });
+        const result = await res.json();
+        if (result.status === 'success') {
+            closeModal('edit-day-modal');
+            fetchEvents();
+            openViewModal(eventId, dateStr);
+        }
+    } catch (err) {
+        console.error(err);
+    }
 }
 
 function closeModal(modalId) {
@@ -879,25 +1223,29 @@ function handleCancelModal() {
     }
 }
 
-async function handleEventSubmit(e) {
-    e.preventDefault();
+async function handleEventSubmit(ev) {
+    ev.preventDefault();
 
     const id = document.getElementById('event-id').value;
     const title = document.getElementById('event-title').value;
     const date = document.getElementById('event-date').value;
-    const end_date = document.getElementById('event-end-date').value;
-    const time = document.getElementById('event-time').value;
+    const end_date = document.getElementById('event-end-date').value || null;
+    const location = document.getElementById('event-location') ? document.getElementById('event-location').value : null;
+    const classification = document.getElementById('event-classification') ? document.getElementById('event-classification').value : null;
+    const colorInput = document.getElementById('event-color-value');
+    const color = colorInput ? colorInput.value : '#93c5fd';
     const description = document.getElementById('event-desc').value;
     const status = document.getElementById('event-status') ? document.getElementById('event-status').value : 'upcoming';
-    
+
     closeModal('event-modal');
 
     setTimeout(async () => {
         try {
+            const payload = { id, title, date, end_date, location, classification, color, description, status };
             const res = await fetch(API_BASE, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id, title, date, end_date, time, description, status })
+                body: JSON.stringify(payload)
             });
             const result = await res.json();
 
@@ -929,41 +1277,85 @@ async function handleEventSubmit(e) {
 }
 
 function checkUpcomingReminders() {
-    const now = new Date();
-    const threeDaysLater = new Date();
-    threeDaysLater.setDate(now.getDate() + 3);
+    const alert = document.getElementById('reminder-alert');
+    const text = document.getElementById('reminder-text');
+    const closeBtn = document.getElementById('reminder-close');
+    if (!alert || !text) return;
 
-    // Find upcoming schedules within the next 3 days
-    const upcoming = events.filter(e => {
-        if (e.status !== 'upcoming') return false;
-        const evtDate = new Date(e.date + 'T00:00:00');
-        // Check if event is in the future and within 3 days
-        return evtDate >= now && evtDate <= threeDaysLater;
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const targetDays = new Set([3, 5, 7]); // workdays
+
+    const upcoming = events
+        .filter(e => {
+            if (e.status !== 'upcoming') return false;
+            const evtStart = new Date(e.date + 'T00:00:00');
+            if (evtStart < now) return false;
+            const workDaysLeft = getDaysUntil(now, evtStart);
+            return targetDays.has(workDaysLeft);
+        })
+        .map(e => {
+            const evtStart = new Date(e.date + 'T00:00:00');
+            const workDaysLeft = getDaysUntil(now, evtStart);
+            return { ...e, _workDaysLeft: workDaysLeft };
+        })
+        .sort((a, b) => (a._workDaysLeft - b._workDaysLeft) || (new Date(a.date) - new Date(b.date)));
+
+    if (upcoming.length === 0) {
+        alert.classList.remove('show');
+        return;
+    }
+
+    const headerHtml = `
+        <div style="display:flex; align-items:flex-start; justify-content: space-between; gap: 12px;">
+            <div>
+                <strong style="display:block; font-size: 16px;">Heads up! You have an upcoming schedule in:</strong>
+            </div>
+        </div>
+    `;
+
+    const listHtml = upcoming.map((e, idx) => {
+        const displayTitle = (e.title || '').length > 40 ? (e.title || '').slice(0, 40) + '…' : (e.title || '');
+        const dateLabel = e.end_date && e.end_date !== e.date
+            ? `${getFullDateString(e.date)} – ${getFullDateString(e.end_date)}`
+            : getFullDateString(e.date);
+        const itemColor = getColorByDate(e.date, e.status, e.end_date);
+        const daysLabel = `${e._workDaysLeft} work day${e._workDaysLeft === 1 ? '' : 's'} left`;
+        const divider = idx === 0 ? '' : `<div style="height:1px; background:#e2e8f0; margin: 12px 0;"></div>`;
+        return `
+            ${divider}
+            <div class="reminder-item" data-event-id="${e.id}" style="display:flex; gap:12px; align-items:stretch; cursor:pointer; padding: 10px 6px; border-radius: 10px;">
+                <div style="width: 6px; border-radius: 6px; background:${itemColor}; flex-shrink:0;"></div>
+                <div style="min-width:0;">
+                    <div style="font-weight:800; color: var(--text-main);">${daysLabel}</div>
+                    <div style="font-weight:700; color: var(--primary-blue); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 420px;">${displayTitle}</div>
+                    <div style="color: var(--text-muted); font-weight:600;">${dateLabel}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    text.innerHTML = headerHtml + listHtml;
+    alert.classList.add('show');
+
+    // Make items clickable; clicking removes that item only (until refresh) and opens details
+    text.querySelectorAll('.reminder-item').forEach(item => {
+        item.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            const id = item.getAttribute('data-event-id');
+            item.remove();
+            // If list is empty after removals, hide
+            if (!text.querySelector('.reminder-item')) {
+                alert.classList.remove('show');
+            }
+            if (id) openViewModal(id);
+        });
     });
 
-    if (upcoming.length > 0) {
-        const nextOne = upcoming[0];
-        const alert = document.getElementById('reminder-alert');
-        const text = document.getElementById('reminder-text');
-
-        const evtDate = new Date(nextOne.date + 'T00:00:00');
-        const daysLeft = Math.max(1, Math.ceil((evtDate - now) / (1000 * 60 * 60 * 24)));
-        const timeStr = formatTimeToAmer(nextOne.time);
-
-        let displayTitle = nextOne.title;
-        if (displayTitle.length > 30) displayTitle = displayTitle.substring(0, 30) + '...';
-
-        text.innerHTML = `
-            <strong>Heads up! You have an upcoming schedule:</strong>
-            <strong>${displayTitle}</strong>
-            <span class="reminder-meta">${daysLeft} day${daysLeft > 1 ? 's' : ''} left • ${timeStr}</span>
-           
-            
-        `;
-        alert.classList.add('show');
-
-        alert.onclick = () => {
-            openViewModal(nextOne.id);
+    // Close button hides for this session only; refresh shows again if matches exist
+    if (closeBtn) {
+        closeBtn.onclick = (ev) => {
+            ev.stopPropagation();
             alert.classList.remove('show');
         };
     }
@@ -981,9 +1373,13 @@ async function cancelMeeting(id) {
                 id: e.id,
                 title: e.title,
                 date: e.date,
-                time: e.time,
+                end_date: e.end_date,
+                location: e.location,
+                classification: e.classification,
                 description: e.description,
-                status: 'cancelled'
+                status: 'cancelled',
+                color: e.color,
+                day_overrides: e.day_overrides
             })
         });
         const result = await res.json();
