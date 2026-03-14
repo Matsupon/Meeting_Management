@@ -498,8 +498,9 @@
     </div>
 
     <!-- View Event Details Modal -->
-    <div class="modal-overlay" id="view-modal">
-        <div class="modal-content" style="max-width: 600px; padding: 40px;">
+    <div class="modal-overlay" id="view-modal" style="z-index: 100000;">
+        <div class="modal-content" style="max-width: 600px; padding: 40px; position: relative;">
+            <div id="view-top-date" style="text-align: center; font-size: 20px; font-weight: 800; color: var(--primary-blue); text-transform: uppercase; margin-bottom: 12px; width: 100%; letter-spacing: 0.5px;"></div>
             <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; gap: 15px; flex-wrap: wrap;">
                 <div style="display:flex; align-items:flex-start; gap:10px; min-width: 0; flex: 1;">
                     <h2 id="view-title" style="word-break: break-word; font-size: 32px; color: var(--text-main); font-weight: 800; margin-bottom: 10px; min-width:0;">Schedule Title</h2>
@@ -507,7 +508,7 @@
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"></path></svg>
                     </button>
                 </div>
-                <span id="view-status-badge" class="status-badge badge-upcoming" style="font-size: 14px; font-weight: 700; padding: 6px 12px; border-radius: 50px; white-space: nowrap; align-self: flex-start;">🟡 Upcoming</span>
+                <span id="view-status-badge" class="status-badge badge-upcoming" style="font-size: 19px; font-weight: 700; padding: 6px 12px; border-radius: 50px; white-space: nowrap; align-self: flex-start;">🟡 Upcoming</span>
             </div>
             
             <div style="margin-bottom: 25px; display: flex; flex-direction: column; gap: 16px;">
@@ -635,7 +636,7 @@
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
                         Cancel Schedule
                     </button>
-                    <button type="button" class="btn btn-subdued" id="btn-delete-view">
+                    <button type="button" class="btn" id="btn-delete-view" style="background: #a9b3c0ff; color: white; box-shadow: 0 4px 14px 0 #a9b3c0ff;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#475569'">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                         Delete Permanently
                     </button>
@@ -652,6 +653,18 @@
                 <button class="btn btn-accent btn-sm" id="btn-add-from-day" style="padding: 8px 16px; font-size: 12px; border-radius: 50px;">+ Add Schedule</button>
             </div>
             <div id="day-events-list"></div>
+        </div>
+    </div>
+
+    <!-- Custom Alert Modal -->
+    <div class="modal-overlay" id="custom-alert-modal" style="z-index: 99999;">
+        <div class="modal-content" style="max-width: 400px; padding: 40px 30px; text-align: center; border-radius: 24px; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);">
+            <div style="width: 80px; height: 80px; background: #e0e7ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; box-shadow: 0 10px 25px rgba(79, 70, 229, 0.2);">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            </div>
+            <h2 style="font-size: 24px; font-weight: 800; color: #1e293b; margin-bottom: 20px; letter-spacing: -0.5px;">Upcoming Reminders</h2>
+            <div id="custom-alert-list" style="margin-bottom: 30px; display: flex; flex-direction: column; gap: 10px; max-height: 40vh; overflow-y: auto; text-align: left; padding: 0 5px;"></div>
+            <button class="btn btn-accent" id="custom-alert-ok" style="width: 100%; padding: 14px; font-size: 16px; border-radius: 12px; box-shadow: 0 8px 20px rgba(79, 70, 229, 0.3);">Okay</button>
         </div>
     </div>
 
@@ -691,5 +704,5 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('script.js') }}"></script>
+<script src="{{ asset('script.js') }}?v={{ time() }}"></script>
 @endpush

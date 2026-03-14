@@ -408,13 +408,15 @@ function getDaysUntil(fromDate, toDate) {
     if (target <= start) return 0;
 
     let count = 0;
+    // Count workdays starting TODAY up to the day BEFORE the schedule.
+    // Excludes Saturday/Sunday, and excludes the schedule day itself.
     let current = new Date(start);
     while (current < target) {
-        current.setDate(current.getDate() + 1);
         const day = current.getDay();
         if (day !== 0 && day !== 6) { // 0 = Sunday, 6 = Saturday
             count++;
         }
+        current.setDate(current.getDate() + 1);
     }
     return count;
 }
@@ -430,7 +432,10 @@ async function fetchEvents() {
             events = result.data.map(e => {
                 const start = new Date(e.date + 'T00:00:00');
                 const end = e.end_date ? new Date(e.end_date + 'T00:00:00') : start;
-                let status = e.status || 'upcoming';
+                let status = (e.status || 'upcoming');
+                if (typeof status === 'string') {
+                    status = status.toString().trim().toLowerCase();
+                }
                 // Automatic status update: only if end date has passed
                 if (end < now && status === 'upcoming') {
                     status = 'completed';
@@ -443,6 +448,8 @@ async function fetchEvents() {
             renderEventList();
             updateBentoStats();
             updateNextMeeting();
+            // Reminders must be computed after events are loaded
+            checkUpcomingReminders();
         }
     } catch (e) {
         console.error('Failed to fetch events', e);
@@ -697,8 +704,15 @@ function renderCalendar() {
         bar.style.setProperty('--bar-start', colStart);
         bar.style.setProperty('--bar-end', colEnd);
         bar.style.setProperty('--bar-bottom', (BOTTOM_PADDING + laneIndex * (BAR_HEIGHT + BAR_GAP)) + 'px');
-        bar.style.backgroundColor = barColor;
-        if (evt.status === 'completed') bar.style.opacity = '0.6';
+        
+        if (evt.status === 'completed') {
+            bar.style.backgroundColor = '#e2e8f0'; // light gray background for legibility
+            bar.style.color = '#64748b'; // finished title text gray
+            bar.style.opacity = '1';
+        } else {
+            bar.style.backgroundColor = barColor;
+        }
+
         bar.textContent = evt.title;
         calendarGrid.appendChild(bar);
     }
@@ -875,13 +889,15 @@ function renderEventList() {
             `;
         })();
 
-        const itemColor = getColorByDate(e.date, e.status, e.end_date);
+        const logicalColor = getColorByDate(e.date, e.status, e.end_date);
+        const badgeColor = e.color || logicalColor;
+
         let statusColorClass = 'status-green';
-        if (itemColor === '#eab308') statusColorClass = 'status-yellow';
-        if (itemColor === '#ea580c') statusColorClass = 'status-amber'; // Soon (warm orange)
-        if (itemColor === '#3b82f6') {
+        if (logicalColor === '#eab308') statusColorClass = 'status-yellow';
+        if (logicalColor === '#ea580c') statusColorClass = 'status-amber'; // Soon (warm orange)
+        if (logicalColor === '#3b82f6') {
             statusColorClass = 'status-blue'; // Ongoing
-        } else if (itemColor === '#64748b') {
+        } else if (logicalColor === '#64748b') {
             statusColorClass = 'status-gray'; // Finished
         } else if (e.status === 'cancelled') {
             statusColorClass = ''; // No indicator for cancelled
@@ -925,11 +941,19 @@ function renderEventList() {
                 ? `${monthStr} ${dayOfMonth}–${endDayOfMonth}`
                 : `${monthStr} ${dayOfMonth} – ${endMonthStr} ${endDayOfMonth}`;
 
+        // Calculate contrast color for the date badge background
+        const hex = badgeColor.replace('#', '');
+        const r = parseInt(hex.substr(0, 2), 16);
+        const g = parseInt(hex.substr(2, 2), 16);
+        const b = parseInt(hex.substr(4, 2), 16);
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        const contrastTextColor = luminance > 0.6 ? '#0f172a' : '#ffffff';
+
         row.innerHTML = `
             <div class="status-line ${statusColorClass}"></div>
-            <div style="position: absolute; right: 16px; top: 10px; font-size: 15px; font-weight: 700; color: ${itemColor};">${daysLeftLabel}</div>
+            <div style="position: absolute; right: 16px; top: 10px; font-size: 15px; font-weight: 700; color: ${logicalColor};">${daysLeftLabel}</div>
             <div style="display: flex; align-items: center; gap: 15px; flex: 1; pointer-events: none; min-width: 0;">
-                <div style="background: var(--primary-blue); color: white; border-radius: 8px; padding: 10px 10px; text-align: center; min-width: 78px; flex-shrink: 0;">
+                <div style="background: ${badgeColor}; color: ${contrastTextColor}; border-radius: 8px; padding: 10px 10px; text-align: center; min-width: 78px; flex-shrink: 0;">
                     ${dateBadgeHtml}
                 </div>
                 <div style="flex: 1; min-width: 0;">
@@ -1020,6 +1044,8 @@ function openViewModal(eventId, dateContext) {
     const dateText = e.end_date && e.end_date !== e.date
         ? `${getFullDateString(e.date)} – ${getFullDateString(e.end_date)}`
         : getFullDateString(e.date);
+    const viewTopDate = document.getElementById('view-top-date');
+    if (viewTopDate) viewTopDate.textContent = getFullDateString(ctxDate);
     const viewDate = document.getElementById('view-date');
     if (viewDate) viewDate.textContent = dateText;
 
@@ -1033,6 +1059,22 @@ function openViewModal(eventId, dateContext) {
     const cHex = normalizeScheduleColor(e.color || '#93c5fd');
     if (viewColorName) viewColorName.textContent = getEventColorName(cHex);
     if (viewColorSwatch) viewColorSwatch.style.background = cHex;
+
+    // Status badge (upcoming/finished/cancelled) based on stored status
+    const badge = document.getElementById('view-status-badge');
+    if (badge) {
+        badge.classList.remove('badge-upcoming', 'badge-completed', 'badge-cancelled');
+        if (e.status === 'completed') {
+            badge.classList.add('badge-completed');
+            badge.textContent = 'Finished';
+        } else if (e.status === 'cancelled') {
+            badge.classList.add('badge-cancelled');
+            badge.textContent = 'Cancelled';
+        } else {
+            badge.classList.add('badge-upcoming');
+            badge.textContent = 'Upcoming';
+        }
+    }
 
     // reset any open editors
     ['title','location','classification','date','color','details'].forEach(cancelViewField);
@@ -1110,31 +1152,21 @@ function openViewModal(eventId, dateContext) {
             text: 'This will mark the schedule as cancelled.',
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: '#fb923c',
+            confirmButtonColor: '#ef4444',
             cancelButtonColor: '#94a3b8',
-            confirmButtonText: 'Yes, cancel it'
+            confirmButtonText: 'Yes, cancel it!'
         }).then((result) => {
             if (result.isConfirmed) {
                 cancelMeeting(e.id);
+                closeModal('view-modal');
             }
         });
     };
     const deleteViewBtn = document.getElementById('btn-delete-view');
     if (deleteViewBtn) deleteViewBtn.onclick = () => {
-        Swal.fire({
-            title: 'Delete Schedule?',
-            text: 'This cannot be undone.',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#fb923c',
-            cancelButtonColor: '#94a3b8',
-            confirmButtonText: 'Yes, delete it'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                closeModal('view-modal');
-                setTimeout(() => deleteEvent(e.id), 150);
-            }
-        });
+        // Use the existing red delete confirmation (deleteEvent)
+        closeModal('view-modal');
+        setTimeout(() => deleteEvent(e.id), 150);
     };
 
     viewModal.classList.add('active');
@@ -1276,11 +1308,15 @@ async function handleEventSubmit(ev) {
     }, 150);
 }
 
+window.reminderShown = window.reminderShown || false;
+
 function checkUpcomingReminders() {
-    const alert = document.getElementById('reminder-alert');
-    const text = document.getElementById('reminder-text');
-    const closeBtn = document.getElementById('reminder-close');
-    if (!alert || !text) return;
+    if (window.reminderShown) return;
+
+    const alertModal = document.getElementById('custom-alert-modal');
+    const alertOk = document.getElementById('custom-alert-ok');
+    const alertList = document.getElementById('custom-alert-list');
+    if (!alertModal || !alertOk || !alertList) return;
 
     const now = new Date();
     now.setHours(0, 0, 0, 0);
@@ -1302,17 +1338,9 @@ function checkUpcomingReminders() {
         .sort((a, b) => (a._workDaysLeft - b._workDaysLeft) || (new Date(a.date) - new Date(b.date)));
 
     if (upcoming.length === 0) {
-        alert.classList.remove('show');
+        alertModal.classList.remove('active');
         return;
     }
-
-    const headerHtml = `
-        <div style="display:flex; align-items:flex-start; justify-content: space-between; gap: 12px;">
-            <div>
-                <strong style="display:block; font-size: 16px;">Heads up! You have an upcoming schedule in:</strong>
-            </div>
-        </div>
-    `;
 
     const listHtml = upcoming.map((e, idx) => {
         const displayTitle = (e.title || '').length > 40 ? (e.title || '').slice(0, 40) + '…' : (e.title || '');
@@ -1320,45 +1348,53 @@ function checkUpcomingReminders() {
             ? `${getFullDateString(e.date)} – ${getFullDateString(e.end_date)}`
             : getFullDateString(e.date);
         const itemColor = getColorByDate(e.date, e.status, e.end_date);
-        const daysLabel = `${e._workDaysLeft} work day${e._workDaysLeft === 1 ? '' : 's'} left`;
-        const divider = idx === 0 ? '' : `<div style="height:1px; background:#e2e8f0; margin: 12px 0;"></div>`;
+        const daysLabel = e._workDaysLeft === 0 ? 'Today' : `${e._workDaysLeft} work day${e._workDaysLeft === 1 ? '' : 's'} left`;
+        
         return `
-            ${divider}
-            <div class="reminder-item" data-event-id="${e.id}" style="display:flex; gap:12px; align-items:stretch; cursor:pointer; padding: 10px 6px; border-radius: 10px;">
+            <div class="reminder-item-real" data-event-id="${e.id}" style="display:flex; gap:12px; align-items:stretch; cursor:pointer; padding: 12px; border-radius: 12px; background: #ffffff; border: 1px solid #e2e8f0; transition: transform 0.2s, box-shadow 0.2s;">
                 <div style="width: 6px; border-radius: 6px; background:${itemColor}; flex-shrink:0;"></div>
-                <div style="min-width:0;">
-                    <div style="font-weight:800; color: var(--text-main);">${daysLabel}</div>
-                    <div style="font-weight:700; color: var(--primary-blue); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 420px;">${displayTitle}</div>
-                    <div style="color: var(--text-muted); font-weight:600;">${dateLabel}</div>
+                <div style="min-width:0; flex: 1;">
+                    <div style="font-weight:800; color: ${itemColor}; font-size: 13px; text-transform: uppercase;">${daysLabel}</div>
+                    <div style="font-weight:700; color: var(--text-main); font-size: 15px; margin: 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;">${displayTitle}</div>
+                    <div style="color: #94a3b8; font-weight:600; font-size: 13px;">${dateLabel}</div>
                 </div>
             </div>
         `;
     }).join('');
 
-    text.innerHTML = headerHtml + listHtml;
-    alert.classList.add('show');
-
-    // Make items clickable; clicking removes that item only (until refresh) and opens details
-    text.querySelectorAll('.reminder-item').forEach(item => {
+    alertList.innerHTML = listHtml;
+    
+    // Add hover effects and click handler
+    alertList.querySelectorAll('.reminder-item-real').forEach(item => {
+        item.addEventListener('mouseenter', () => {
+            item.style.transform = 'translateY(-2px)';
+            item.style.boxShadow = '0 6px 15px rgba(0,0,0,0.06)';
+        });
+        item.addEventListener('mouseleave', () => {
+            item.style.transform = 'none';
+            item.style.boxShadow = 'none';
+        });
         item.addEventListener('click', (ev) => {
             ev.stopPropagation();
             const id = item.getAttribute('data-event-id');
-            item.remove();
-            // If list is empty after removals, hide
-            if (!text.querySelector('.reminder-item')) {
-                alert.classList.remove('show');
+            if (id) {
+                // Open view details without closing the reminder
+                openViewModal(id);
             }
-            if (id) openViewModal(id);
         });
     });
 
-    // Close button hides for this session only; refresh shows again if matches exist
-    if (closeBtn) {
-        closeBtn.onclick = (ev) => {
-            ev.stopPropagation();
-            alert.classList.remove('show');
-        };
-    }
+    alertModal.classList.add('active');
+    window.reminderShown = true;
+
+    // Remove old listeners to avoid memory leaks
+    const newOk = alertOk.cloneNode(true);
+    alertOk.parentNode.replaceChild(newOk, alertOk);
+
+    // Keep it persistent until they specifically click OK
+    newOk.addEventListener('click', () => {
+        alertModal.classList.remove('active');
+    });
 }
 
 async function cancelMeeting(id) {
