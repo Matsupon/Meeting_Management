@@ -548,11 +548,16 @@
         <div class="modal-content" style="max-width: 600px; padding: 40px; position: relative;">
             <div id="view-top-date" style="text-align: center; font-size: 20px; font-weight: 800; color: var(--primary-blue); text-transform: uppercase; margin-bottom: 12px; width: 100%; letter-spacing: 0.5px;"></div>
             <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; gap: 15px; flex-wrap: wrap;">
-                <div style="display:flex; align-items:flex-start; gap:10px; min-width: 0; flex: 1;">
-                    <h2 id="view-title" style="word-break: break-word; font-size: 32px; color: var(--text-main); font-weight: 800; margin-bottom: 10px; min-width:0;">Schedule Title</h2>
-                    <button type="button" class="view-inline-edit-btn" data-field="title" aria-label="Edit title" style="display:none; margin-top: 6px; background:transparent; border:none; cursor:pointer; padding:6px; flex-shrink:0;">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"></path></svg>
-                    </button>
+                <div style="display:flex; flex-direction:column; align-items:flex-start; gap:6px; min-width: 0; flex: 1;">
+                    <div style="display:flex; align-items:flex-start; gap:10px; width:100%;">
+                        <h2 id="view-title" style="word-break: break-word; font-size: 32px; color: var(--text-main); font-weight: 800; margin-bottom: 0; min-width:0; flex:1;">
+                            <span id="view-title-text">Schedule Title</span>
+                        </h2>
+                        <button type="button" class="view-inline-edit-btn" data-field="title" aria-label="Edit title" style="display:none; margin-top: 6px; background:transparent; border:none; cursor:pointer; padding:6px; flex-shrink:0;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"></path></svg>
+                        </button>
+                    </div>
+                    <input type="text" id="view-title-input" style="display:none; width:100%; padding: 10px 14px; font-size: 22px; font-weight: 700; border: 2px solid var(--primary-blue); border-radius: 10px; background:#fff; color: var(--text-main);">
                 </div>
                 <span id="view-status-badge" class="status-badge badge-upcoming" style="font-size: 19px; font-weight: 700; padding: 6px 12px; border-radius: 50px; white-space: nowrap; align-self: flex-start;">🟡 Upcoming</span>
             </div>

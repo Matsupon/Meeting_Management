@@ -388,7 +388,8 @@ async function saveViewField(field) {
                 position: 'top',
                 showConfirmButton: false,
                 timer: 1500,
-                timerProgressBar: true
+                timerProgressBar: true,
+                didOpen: (popup) => { popup.parentElement.style.zIndex = '200000'; }
             });
             // Exit edit mode after save
             viewEditMode = false;
@@ -457,7 +458,7 @@ function startViewField(field) {
         const input = document.getElementById('view-title-input');
         const span = document.getElementById('view-title-text');
         if (span) span.style.display = 'none';
-        if (input) { input.style.display = 'inline-flex'; input.value = currentViewOriginal.title || ''; input.focus(); }
+        if (input) { input.style.display = 'block'; input.value = currentViewOriginal.title || ''; input.focus(); }
     }
     if (field === 'location') {
         const input = document.getElementById('view-location-input');
@@ -1134,9 +1135,7 @@ function openViewModal(eventId, dateContext) {
         details: effDescription || '',
     };
 
-    const viewTitle = document.getElementById('view-title');
     const viewTitleText = document.getElementById('view-title-text');
-    if (viewTitle) viewTitle.textContent = effTitle;
     if (viewTitleText) viewTitleText.textContent = effTitle;
     const titleInput = document.getElementById('view-title-input');
     if (titleInput) titleInput.value = effTitle || '';
