@@ -155,6 +155,21 @@ body {
     border-color: var(--primary-blue);
     box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
     background: white;
+    color: var(--text-main);
+}
+
+/* Targeted font size increases (+5px) for specific modal fields */
+#event-location,
+#view-location-input,
+#event-classification,
+#view-classification-input,
+#event-date,
+#event-end-date,
+#view-date-start-input,
+#view-date-end-input,
+.flatpickr-input {
+    font-size: calc(var(--font-size-base) + 5px) !important;
+    font-weight: 600 !important;
 }
 
 /* Login specific styles */
@@ -747,11 +762,11 @@ body {
 /* Time Picker refinement */
 select#event-time,
 select#edit-event-time {
-    height: 42px; /* Increased height for larger font */
+    height: 42px;
     padding: 0 15px;
     border-radius: 10px;
     border: 1px solid #e2e8f0;
-    font-size: 16px; /* Increased from 12px */
+    font-size: 16px;
     font-weight: 600;
     background-color: white;
     /* Dropdown direction hints for browser */

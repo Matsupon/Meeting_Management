@@ -24,6 +24,7 @@ let countdownInterval = null;
 let currentViewContext = { eventId: null, date: null };
 let currentViewOriginal = {};
 let viewEditMode = false;
+let startPicker, endPicker, viewStartPicker, viewEndPicker;
 
 // Initialization
 document.addEventListener('DOMContentLoaded', () => {
@@ -264,6 +265,54 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const fpOptions = {
+        altInput: true,
+        altFormat: "m/d/Y",
+        dateFormat: "Y-m-d",
+        allowInput: true,
+        clearButton: true
+    };
+
+    startPicker = flatpickr("#event-date", {
+        ...fpOptions,
+        onChange: function(selectedDates, dateStr) {
+            if (dateStr && endPicker) endPicker.set("minDate", dateStr);
+        }
+    });
+
+    endPicker = flatpickr("#event-end-date", {
+        ...fpOptions,
+        onChange: function(selectedDates, dateStr) {
+            if (dateStr && startPicker) startPicker.set("maxDate", dateStr);
+            else if (!dateStr && startPicker) startPicker.set("maxDate", null);
+        }
+    });
+
+    viewStartPicker = flatpickr("#view-date-start-input", {
+        ...fpOptions,
+        onChange: function(selectedDates, dateStr) {
+            if (dateStr && viewEndPicker) viewEndPicker.set("minDate", dateStr);
+        }
+    });
+
+    viewEndPicker = flatpickr("#view-date-end-input", {
+        ...fpOptions,
+        onChange: function(selectedDates, dateStr) {
+            if (dateStr && viewStartPicker) viewStartPicker.set("maxDate", dateStr);
+            else if (!dateStr && viewStartPicker) viewStartPicker.set("maxDate", null);
+        }
+    });
+
+    // Initialize date clearance buttons
+    document.querySelectorAll('.clear-date-btn').forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            const inputId = btn.getAttribute('data-input');
+            if (inputId === 'event-end-date' && endPicker) endPicker.clear();
+            if (inputId === 'view-date-end-input' && viewEndPicker) viewEndPicker.clear();
+        };
+    });
+
     setTimeout(checkUpcomingReminders, 1000);
 });
 
@@ -340,9 +389,13 @@ async function saveViewField(field) {
     }
     if (field === 'date') {
         const startVal = document.getElementById('view-date-start-input')?.value || '';
-        const endVal = document.getElementById('view-date-end-input')?.value || '';
+        const endVal = (viewEndPicker && viewEndPicker.selectedDates.length > 0) ? document.getElementById('view-date-end-input').value : null;
         next.date = startVal || next.date;
-        next.end_date = endVal || null;
+        next.end_date = endVal;
+        
+        // Ensure pickers are synced after manual value change if any
+        if (viewStartPicker) viewStartPicker.setDate(next.date);
+        if (viewEndPicker) viewEndPicker.setDate(next.end_date);
     }
     if (field === 'color') {
         const selected = currentViewOriginal.color || next.color;
@@ -474,11 +527,9 @@ function startViewField(field) {
     }
     if (field === 'date') {
         const edit = document.getElementById('view-date-edit');
-        const start = document.getElementById('view-date-start-input');
-        const end = document.getElementById('view-date-end-input');
         if (edit) edit.style.display = 'flex';
-        if (start) start.value = currentViewOriginal.date || '';
-        if (end) end.value = currentViewOriginal.end_date || '';
+        if (viewStartPicker) viewStartPicker.setDate(currentViewOriginal.date || '');
+        if (viewEndPicker) viewEndPicker.setDate(currentViewOriginal.end_date || '');
     }
     if (field === 'color') {
         const palette = document.getElementById('view-color-palette');
@@ -666,7 +717,8 @@ function renderCalendar() {
                         closeModal('day-events-modal');
                         selectedFilterDate = cellDate;
                         openModal('add');
-                        document.getElementById('event-date').value = cellDate;
+                        if (startPicker) startPicker.setDate(cellDate);
+                        else document.getElementById('event-date').value = cellDate;
                     };
                     const list = document.getElementById('day-events-list');
                     list.innerHTML = '';
@@ -711,7 +763,8 @@ function renderCalendar() {
                 } else {
                     selectedFilterDate = cellDate;
                     openModal('add');
-                    document.getElementById('event-date').value = cellDate;
+                    if (startPicker) startPicker.setDate(cellDate);
+                    else document.getElementById('event-date').value = cellDate;
                 }
             });
         }
@@ -1085,7 +1138,9 @@ function openModal(mode, eventId) {
 
     if (mode === 'add') {
         document.getElementById('modal-title').textContent = 'Add New Schedule';
-        document.getElementById('event-date').value = selectedFilterDate || new Date().toISOString().split('T')[0];
+        const defaultDate = selectedFilterDate || new Date().toISOString().split('T')[0];
+        if (startPicker) startPicker.setDate(defaultDate);
+        if (endPicker) endPicker.setDate('');
         document.getElementById('status-group').style.display = 'none';
         setEventColorPicker('#93c5fd', 'Soft Blue');
     } else if (mode === 'edit') {
@@ -1095,8 +1150,8 @@ function openModal(mode, eventId) {
         if (e) {
             document.getElementById('event-id').value = e.id;
             document.getElementById('event-title').value = e.title;
-            document.getElementById('event-date').value = e.date;
-            document.getElementById('event-end-date').value = e.end_date || '';
+            if (startPicker) startPicker.setDate(e.date);
+            if (endPicker) endPicker.setDate(e.end_date || '');
             if (locEl) locEl.value = e.location || '';
             if (classEl) classEl.value = e.classification || '';
             document.getElementById('event-desc').value = e.description || '';
@@ -1361,12 +1416,12 @@ async function handleEventSubmit(ev) {
     const id = document.getElementById('event-id').value;
     const title = document.getElementById('event-title').value;
     const date = document.getElementById('event-date').value;
-    const end_date = document.getElementById('event-end-date').value || null;
     const location = document.getElementById('event-location') ? document.getElementById('event-location').value : null;
     const classification = document.getElementById('event-classification') ? document.getElementById('event-classification').value : null;
     const colorInput = document.getElementById('event-color-value');
     const color = colorInput ? colorInput.value : '#93c5fd';
-    const description = document.getElementById('event-desc').value;
+    const end_date = (endPicker && endPicker.selectedDates.length > 0) ? document.getElementById('event-end-date').value : null;
+    const description = (document.getElementById('event-desc')?.value || '').trim();
     const status = document.getElementById('event-status') ? document.getElementById('event-status').value : 'upcoming';
 
     closeModal('event-modal');

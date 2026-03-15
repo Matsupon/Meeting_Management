@@ -381,33 +381,6 @@
             </div>
             
             <div style="display: flex; align-items: center; gap: 20px;">
-                <!-- Create Summary Dropdown -->
-                <div class="dropdown" style="position: relative;">
-                    <button class="btn btn-primary" id="btn-create-summary" style="display: flex; align-items: center; gap: 8px;">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                        Create Summary
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                    </button>
-                    <div id="summary-dropdown-menu" style="display: none; position: absolute; top: 100%; left: 0; margin-top: 8px; background: white; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); min-width: 200px; z-index: 1000; overflow: hidden;">
-                        <div style="padding: 12px 16px; font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid #e2e8f0;">Select Period</div>
-                        <div class="summary-month-option" data-month="0">January</div>
-                        <div class="summary-month-option" data-month="1">February</div>
-                        <div class="summary-month-option" data-month="2">March</div>
-                        <div class="summary-month-option" data-month="3">April</div>
-                        <div class="summary-month-option" data-month="4">May</div>
-                        <div class="summary-month-option" data-month="5">June</div>
-                        <div class="summary-month-option" data-month="6">July</div>
-                        <div class="summary-month-option" data-month="7">August</div>
-                        <div class="summary-month-option" data-month="8">September</div>
-                        <div class="summary-month-option" data-month="9">October</div>
-                        <div class="summary-month-option" data-month="10">November</div>
-                        <div class="summary-month-option" data-month="11">December</div>
-                        <div style="border-top: 2px solid #e2e8f0;"></div>
-                        <div class="summary-month-option" data-month="all" style="font-weight: 700; color: var(--primary-blue);">All Year</div>
-                    </div>
-                </div>
-                
-                <button class="btn btn-primary" id="btn-add-schedule">+ Add New Schedule</button>
                 <div class="profile-container">
                     <button class="profile-btn" id="profile-btn">
                         @if($user->profile_picture)
@@ -522,11 +495,14 @@
             <div class="form-row">
                 <div class="form-group">
                     <label for="event-date">Date Started</label>
-                    <input type="date" id="event-date" name="date" required>
+                    <input type="text" id="event-date" name="date" required placeholder="Select start date">
                 </div>
-                <div class="form-group">
+                <div class="form-group" style="position: relative;">
                     <label for="event-end-date">Date Ended (optional)</label>
-                    <input type="date" id="event-end-date" name="end_date">
+                    <div style="position: relative; display: flex; align-items: center;">
+                        <input type="text" id="event-end-date" name="end_date" placeholder="Select end date" style="flex: 1;">
+                        <button type="button" class="clear-date-btn" data-input="event-end-date" title="Clear date" style="position: absolute; right: 10px; background: transparent; border: none; cursor: pointer; color: var(--text-muted); font-size: 18px;">&times;</button>
+                    </div>
                 </div>
             </div>
             <div class="form-group" id="status-group" style="display: none;">
@@ -630,11 +606,14 @@
                 <div id="view-date-edit" style="display:none; gap:12px; margin-top:10px; flex-wrap:wrap;">
                     <div style="flex:1 1 180px;">
                         <div style="font-size: 12px; font-weight: 800; color: var(--text-muted); margin-bottom: 6px;">Date Started</div>
-                        <input type="date" id="view-date-start-input" style="width:100%; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 10px; background:#fff;">
+                        <input type="text" id="view-date-start-input" style="width:100%; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 10px; background:#fff;" placeholder="Select start date">
                     </div>
-                    <div style="flex:1 1 180px;">
+                    <div style="flex:1 1 180px; position: relative;">
                         <div style="font-size: 12px; font-weight: 800; color: var(--text-muted); margin-bottom: 6px;">Date Ended (optional)</div>
-                        <input type="date" id="view-date-end-input" style="width:100%; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 10px; background:#fff;">
+                        <div style="position: relative; display: flex; align-items: center;">
+                            <input type="text" id="view-date-end-input" style="width:100%; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 10px; background:#fff;" placeholder="Select end date">
+                            <button type="button" class="clear-date-btn" data-input="view-date-end-input" title="Clear date" style="position: absolute; right: 10px; background: transparent; border: none; cursor: pointer; color: var(--text-muted); font-size: 18px;">&times;</button>
+                        </div>
                     </div>
                 </div>
                 <button type="button" class="view-inline-edit-btn" data-field="date" aria-label="Edit date" style="position:absolute; right:0; top:0; background:transparent; border:none; cursor:pointer; padding:6px;">

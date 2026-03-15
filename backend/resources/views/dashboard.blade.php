@@ -490,11 +490,14 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="event-date">Date Started</label>
-                        <input type="date" id="event-date" name="date" required>
+                        <input type="text" id="event-date" name="date" required placeholder="Select start date">
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" style="position: relative;">
                         <label for="event-end-date">Date Ended (optional)</label>
-                        <input type="date" id="event-end-date" name="end_date">
+                        <div style="position: relative; display: flex; align-items: center;">
+                            <input type="text" id="event-end-date" name="end_date" placeholder="Select end date" style="flex: 1;">
+                            <button type="button" class="clear-date-btn" data-input="event-end-date" title="Clear date" style="position: absolute; right: 10px; background: transparent; border: none; cursor: pointer; color: var(--text-muted); font-size: 18px;">&times;</button>
+                        </div>
                     </div>
                 </div>
                 
@@ -611,11 +614,14 @@
                     <div id="view-date-edit" style="display:none; gap:12px; margin-top:10px; flex-wrap:wrap;">
                         <div style="flex:1 1 180px;">
                             <div style="font-size: 12px; font-weight: 800; color: var(--text-muted); margin-bottom: 6px;">Date Started</div>
-                            <input type="date" id="view-date-start-input" style="width:100%; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 10px; background:#fff;">
+                            <input type="text" id="view-date-start-input" style="width:100%; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 10px; background:#fff;" placeholder="Select start date">
                         </div>
-                        <div style="flex:1 1 180px;">
+                        <div style="flex:1 1 180px; position: relative;">
                             <div style="font-size: 12px; font-weight: 800; color: var(--text-muted); margin-bottom: 6px;">Date Ended (optional)</div>
-                            <input type="date" id="view-date-end-input" style="width:100%; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 10px; background:#fff;">
+                            <div style="position: relative; display: flex; align-items: center;">
+                                <input type="text" id="view-date-end-input" style="width:100%; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 10px; background:#fff;" placeholder="Select end date">
+                                <button type="button" class="clear-date-btn" data-input="view-date-end-input" title="Clear date" style="position: absolute; right: 10px; background: transparent; border: none; cursor: pointer; color: var(--text-muted); font-size: 18px;">&times;</button>
+                            </div>
                         </div>
                     </div>
                     <button type="button" class="view-inline-edit-btn" data-field="date" aria-label="Edit date" style="position:absolute; right:0; top:0; background:transparent; border:none; cursor:pointer; padding:6px;">
