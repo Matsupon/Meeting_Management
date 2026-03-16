@@ -226,9 +226,16 @@ body {
     position: relative;
 }
 
-/* Calendar day refinements */
+/* Calendar day - table style, no rounded edges, compact */
+.calendar-day {
+    border-radius: 0;
+    border: 1px solid #e5e7eb;
+    min-height: 0;
+}
+
 .calendar-day:hover {
-    background: skyblue !important;
+    background: rgba(241, 245, 249, 0.9) !important;
+    /* No transform or box-shadow animation */
 }
 
 .finished-day::after {
@@ -262,28 +269,30 @@ body {
 }
 
 .calendar-day.finished-day {
-    background: #e5e7eb;
-    color: #9ca3af;
     position: relative;
 }
 
-.calendar-day.finished-day::before {
+/* Gray overlay only for truly past days (all schedules done) */
+.calendar-day.past-no-finish {
+    position: relative;
+}
+
+.calendar-day.past-no-finish::before {
     content: '';
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    background: rgba(148, 163, 184, 0.45); /* gray overlay covering title */
+    background: rgba(148, 163, 184, 0.35);
     pointer-events: none;
 }
 
-.calendar-day.finished-day > * {
+.calendar-day.past-no-finish > * {
     position: relative;
     z-index: 1;
 }
 
 .calendar-day.finished-day:hover {
     background: rgba(187, 247, 208, 0.9) !important; /* light green */
-    box-shadow: 0 10px 25px rgba(22, 163, 74, 0.3);
 }
 
 .chip {
@@ -322,7 +331,8 @@ body {
 .status-green { background: #22c55e; }
 .status-yellow { background: #eab308; }
 .status-red { background: #ef4444; }
-.status-blue { background: #3b82f6; } /* Finished */
+.status-blue { background: #3b82f6; } /* Ongoing */
+.status-gray { background: #64748b; } /* Finished */
 
 .event-title-cancelled {
     text-decoration: line-through;
@@ -343,7 +353,8 @@ body {
 }
 
 .pill-upcoming { background: #fef08a; color: #854d0e; }
-.pill-completed { background: #bfdbfe; color: #1e3a8a; } /* Blue for finished */
+.pill-completed { background: #e2e8f0; color: #475569; } /* Gray for finished */
+.pill-ongoing { background: #bfdbfe; color: #1e3a8a; } /* Blue for ongoing */
 .pill-cancelled { background: #fecaca; color: #991b1b; }
 
 /* Badges for Modals */
@@ -453,7 +464,7 @@ body {
 .sidebar-divider {
     height: 1px;
     background: rgba(226, 232, 240, 0.8);
-    margin: 20px 0;
+    margin: 12px 0;
 }
 
 /* Sidebar Push Layout */
@@ -465,12 +476,12 @@ body {
 }
 
 .sidebar-main {
-    width: 320px;
+    width: 380px;
     height: 100vh;
     background: white;
     box-shadow: 4px 0 20px rgba(0, 0, 0, 0.05);
     z-index: 100;
-    margin-left: -320px;
+    margin-left: -380px;
     transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     flex-direction: column;
@@ -608,9 +619,46 @@ body {
 .calendar-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    grid-auto-rows: 1fr;
-    gap: 8px;
+    grid-template-rows: repeat(6, minmax(94px, 1fr));
+    gap: 0;
     flex: 1;
+    position: relative;
+}
+
+/* Event bar - single pill spanning across days, bottom aligned */
+.calendar-event-bar {
+    grid-column: var(--bar-start, 1) / var(--bar-end, 2);
+    grid-row: var(--bar-row, 1);
+    align-self: end;
+    margin-bottom: var(--bar-bottom, 2px);
+    height: 20px;
+    padding: 0 8px;
+    display: flex;
+    align-items: center;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    color: white;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    z-index: 2;
+    pointer-events: none;
+    min-width: 0;
+}
+
+.calendar-day {
+    z-index: 0;
+}
+
+/* Center the day number, reserve bottom space for pills */
+.calendar-day {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 6px 48px;
 }
 
 /* Time Picker refinement */
@@ -637,8 +685,8 @@ select#event-time, select#edit-event-time {
     background: #f8fafc;
     padding: 15px;
     border-radius: var(--border-radius-md);
-    margin-top: 20px;
-    margin-bottom: 25px;
+    margin-top: 12px;
+    margin-bottom: 12px;
     border: 1px solid #e2e8f0;
 }
 
@@ -669,15 +717,21 @@ select#event-time, select#edit-event-time {
 .legend-color.yellow { background: #eab308; }
 .legend-color.red { background: #ef4444; }
 .legend-color.blue { background: #3b82f6; }
+.legend-color.gray { background: #64748b; }
 
 /* Sidebar Components update */
 .sidebar-input {
     width: 100%;
-    padding: 12px 18px;
+    padding: 8px 12px;
     border-radius: var(--border-radius-md);
     border: 2px solid #e2e8f0;
-    font-size: 14px;
+    font-size: 12px;
     background: white;
+}
+
+/* Center status chips */
+#status-filters {
+    justify-content: center;
 }
 
 .sidebar-select {
@@ -693,7 +747,7 @@ select#event-time, select#edit-event-time {
 }
 
 .sidebar-list {
-    max-height: 400px;
+    max-height: none;
 }
 
 .sidebar-footer {
@@ -779,9 +833,9 @@ select#event-time, select#edit-event-time {
 }
 
 .reminder-title {
-    font-size: 16px;
+    font-size: 29px;
     font-weight: 700;
-    color: #111827;
+    color: #000000;
 }
 
 .reminder-meta {

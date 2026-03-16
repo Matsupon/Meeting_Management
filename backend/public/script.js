@@ -130,6 +130,15 @@ function getFullDateString(dateStr) {
     return `${mNames[dObj.getMonth()]} ${dObj.getDate()}, ${dObj.getFullYear()}`;
 }
 
+function getDaysUntil(fromDate, toDate) {
+    const start = new Date(fromDate);
+    start.setHours(0, 0, 0, 0);
+    const target = new Date(toDate);
+    target.setHours(0, 0, 0, 0);
+    const diffTime = target - start;
+    return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+}
+
 async function fetchEvents() {
     try {
         const response = await fetch(API_BASE);
@@ -139,10 +148,11 @@ async function fetchEvents() {
             now.setHours(0, 0, 0, 0);
 
             events = result.data.map(e => {
-                const evtDate = new Date(e.date + 'T00:00:00');
+                const start = new Date(e.date + 'T00:00:00');
+                const end = e.end_date ? new Date(e.end_date + 'T00:00:00') : start;
                 let status = e.status || 'upcoming';
-                // Automatic status update for past dates
-                if (evtDate < now && status === 'upcoming') {
+                // Automatic status update: only if end date has passed
+                if (end < now && status === 'upcoming') {
                     status = 'completed';
                 }
                 return { ...e, status };
@@ -159,16 +169,19 @@ async function fetchEvents() {
     }
 }
 
-function getColorByDate(dateStr, status) {
+function getColorByDate(dateStr, status, endDateStr) {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
-    const target = new Date(dateStr + 'T00:00:00');
-    const diffDays = Math.ceil((target - now) / (1000 * 60 * 60 * 24));
+    const start = new Date(dateStr + 'T00:00:00');
+    const end = endDateStr ? new Date(endDateStr + 'T00:00:00') : start;
+    const diffDays = Math.ceil((start - now) / (1000 * 60 * 60 * 24));
 
-    if (target < now || status === 'completed') return '#3b82f6'; // Blue for finished
+    if (status === 'completed') return '#64748b'; // Gray for finished
+    if (now >= start && now <= end && status === 'upcoming') return '#3b82f6'; // Blue for ongoing
+    
     if (diffDays >= 7) return '#22c55e'; // Green
     if (diffDays >= 5) return '#eab308'; // Yellow
-    if (diffDays <= 4) return '#ef4444'; // Red (User said March 16 from 12 should be Red)
+    if (diffDays <= 4) return '#ef4444'; // Red
     return '#22c55e';
 }
 
@@ -183,42 +196,61 @@ function renderCalendar() {
 
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const totalCells = firstDay + daysInMonth;
+    const numRows = Math.ceil(totalCells / 7);
 
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const nowDateTime = new Date();
+
+    // Helper: cell index (0-based) -> grid row and col (1-based)
+    function cellToGrid(cellIndex) {
+        const r = Math.floor(cellIndex / 7);
+        const c = cellIndex % 7;
+        return { row: r + 1, col: c + 1 };
+    }
+
+    // Empty cells for offset
     for (let i = 0; i < firstDay; i++) {
         const cell = document.createElement('div');
+        const { row, col } = cellToGrid(i);
+        cell.style.gridRow = row;
+        cell.style.gridColumn = col;
         calendarGrid.appendChild(cell);
     }
 
+    // Day cells only (no event blocks inside) – table style, no rounded corners, no hover animation
     for (let i = 1; i <= daysInMonth; i++) {
         const cell = document.createElement('div');
         cell.className = 'calendar-day glass';
 
         const cellDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
         const cellDateObj = new Date(cellDate + 'T00:00:00');
-        const now = new Date();
-        now.setHours(0, 0, 0, 0);
+        const cellIndex = firstDay + (i - 1);
+        const { row, col } = cellToGrid(cellIndex);
 
-        cell.style.cssText = 'padding: 15px 10px; text-align: center; border-radius: 12px; cursor: pointer; position: relative; display:flex; flex-direction:column; justify-content:center; align-items:center; transition: all 0.2s ease;';
+        cell.style.gridRow = row;
+        cell.style.gridColumn = col;
+        // Keep inline styles minimal; layout handled by CSS for table look
+        cell.style.cssText += 'text-align: center; cursor: pointer; position: relative;';
 
-        // Find events that occur on this date (Exclude Cancelled)
         const dayEvents = events.filter(e => {
-            if (e.status === 'cancelled') return false; // Hide cancelled meetings from calendar
+            if (e.status === 'cancelled') return false;
             const start = new Date(e.date + 'T00:00:00');
             const end = e.end_date ? new Date(e.end_date + 'T00:00:00') : start;
             return cellDateObj >= start && cellDateObj <= end;
         });
 
-        // Add finished-day class if any event in this day is finished OR date is past AND has events
         const isPast = cellDateObj < now;
         const hasFinishedEvents = dayEvents.some(e => e.status === 'completed');
-        // Checkmark only if the day has actual non-cancelled events AND (it's in the past OR specifically marked completed)
-        if (dayEvents.length > 0 && (isPast || hasFinishedEvents)) {
-            cell.classList.add('finished-day');
-        }
-
-        if (isPast && !hasFinishedEvents) {
-            cell.classList.add('past-no-finish');
-        }
+        // Gray only when date is strictly in the past AND every schedule on that day has passed or is finished (never gray today)
+        const todayStr = new Date().toISOString().split('T')[0];
+        const allSchedulesDone = dayEvents.length === 0 || dayEvents.every(e => {
+            const evtTime = new Date(`${e.date}T${e.time}:00`);
+            return e.status === 'completed' || evtTime < nowDateTime;
+        });
+        if (hasFinishedEvents) cell.classList.add('finished-day');
+        if (cellDate !== todayStr && isPast && allSchedulesDone) cell.classList.add('past-no-finish');
 
         const dayText = document.createElement('div');
         dayText.textContent = i;
@@ -232,58 +264,13 @@ function renderCalendar() {
             dayText.style.color = 'var(--primary-blue)';
         }
 
-        if (dayEvents.length > 0) {
-            const eventBlockContainer = document.createElement('div');
-            eventBlockContainer.style.cssText = 'width: 100%; display: flex; flex-direction: column; gap: 2px; margin-top: 5px; overflow: hidden;';
-
-            dayEvents.forEach((evt, idx) => {
-                if (idx > 1) return; // Limit to 2 for space
-                const blockColor = getColorByDate(evt.date, evt.status);
-                const block = document.createElement('div');
-                block.style.cssText = `
-                    font-size: 10px; 
-                    padding: 2px 4px; 
-                    border-radius: 4px; 
-                    background-color: ${blockColor}; 
-                    color: white; 
-                    white-space: nowrap; 
-                    overflow: hidden; 
-                    text-overflow: ellipsis; 
-                    width: 100%;
-                    text-align: left;
-                    font-weight: 600;
-                `;
-                block.textContent = evt.title;
-                block.style.cursor = 'pointer';
-                block.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    openViewModal(evt.id);
-                });
-                eventBlockContainer.appendChild(block);
-            });
-            cell.appendChild(eventBlockContainer);
-        }
-
-        if (!isPast || hasFinishedEvents) {
-            cell.addEventListener('mouseenter', () => {
-                if (cellDate !== new Date().toISOString().split('T')[0]) {
-                    cell.style.background = 'white';
-                }
-                cell.style.transform = 'translateY(-2px)';
-                cell.style.boxShadow = '0 10px 15px -3px rgba(37,99,235,0.1)';
-            });
-            cell.addEventListener('mouseleave', () => {
-                if (cellDate !== new Date().toISOString().split('T')[0]) {
-                    cell.style.background = 'rgba(255, 255, 255, 0.85)';
-                }
-                cell.style.transform = 'translateY(0)';
-                cell.style.boxShadow = 'var(--box-shadow)';
-            });
-
+        const hasUpcomingOrFuture = dayEvents.some(e => {
+            const evtTime = new Date(`${e.date}T${e.time}:00`);
+            return e.status === 'upcoming' && evtTime > nowDateTime;
+        });
+        if (!isPast || hasFinishedEvents || hasUpcomingOrFuture) {
             cell.addEventListener('click', () => {
-                if (dayEvents.length === 1) {
-                    openViewModal(dayEvents[0].id);
-                } else if (dayEvents.length > 1) {
+                if (dayEvents.length > 0) {
                     const modal = document.getElementById('day-events-modal');
                     document.getElementById('day-events-title').textContent = `Events for ${i} ${monthNames[month]}`;
                     const addBtn = document.getElementById('btn-add-from-day');
@@ -293,15 +280,13 @@ function renderCalendar() {
                         openModal('add');
                         document.getElementById('event-date').value = cellDate;
                     };
-
                     const list = document.getElementById('day-events-list');
                     list.innerHTML = '';
                     list.style.cssText = 'display: flex; flex-direction: column; gap: 15px; margin-top: 20px;';
-
                     dayEvents.forEach(e => {
                         const card = document.createElement('div');
                         card.className = 'glass';
-                        card.style.cssText = 'padding: 20px; border-radius: var(--border-radius-md); box-shadow: var(--box-shadow); cursor: pointer; text-align: left; transition: transform 0.2s ease;';
+                        card.style.cssText = 'padding: 20px; border-radius: var(--border-radius-md); box-shadow: var(--box-shadow); cursor: pointer; text-align: left;';
                         let dotClass = 'status-upcoming';
                         if (e.status === 'completed') dotClass = 'status-completed';
                         if (e.status === 'cancelled') dotClass = 'status-cancelled';
@@ -315,12 +300,7 @@ function renderCalendar() {
                                 ${formatTimeToAmer(e.time)}
                             </div>
                         `;
-                        card.onmouseenter = () => card.style.transform = 'translateY(-2px)';
-                        card.onmouseleave = () => card.style.transform = 'translateY(0)';
-                        card.onclick = () => {
-                            closeModal('day-events-modal');
-                            openViewModal(e.id);
-                        };
+                        card.onclick = () => { closeModal('day-events-modal'); openViewModal(e.id); };
                         list.appendChild(card);
                     });
                     modal.classList.add('active');
@@ -333,6 +313,99 @@ function renderCalendar() {
         }
 
         calendarGrid.appendChild(cell);
+    }
+
+    // Events that fall in this month (non-cancelled)
+    const monthStart = new Date(year, month, 1);
+    const monthEnd = new Date(year, month + 1, 0);
+    const eventsInMonth = events.filter(e => {
+        if (e.status === 'cancelled') return false;
+        const start = new Date(e.date + 'T00:00:00');
+        const end = e.end_date ? new Date(e.end_date + 'T00:00:00') : start;
+        return start <= monthEnd && end >= monthStart;
+    });
+
+    // Build per-week-row segments and lane-assign them so different schedules never overlap.
+    // Also enforce the requirement: max 2 bars per day cell.
+    const BAR_GAP = 2;
+    const BAR_HEIGHT = 20;
+    const BOTTOM_PADDING = 8;
+
+    // dayCounts[row][col] counts how many bars already occupy this cell
+    const dayCounts = {};
+    const getCount = (r, c) => (dayCounts[r]?.[c] ?? 0);
+    const incCount = (r, c) => {
+        if (!dayCounts[r]) dayCounts[r] = {};
+        dayCounts[r][c] = (dayCounts[r][c] || 0) + 1;
+    };
+
+    // Build segments per row (split events across week rows)
+    const segmentsByRow = {};
+    eventsInMonth.forEach(evt => {
+        const start = new Date(evt.date + 'T00:00:00');
+        const end = evt.end_date ? new Date(evt.end_date + 'T00:00:00') : start;
+        const startMonth = start.getMonth();
+        const endMonth = end.getMonth();
+
+        const clipStartDay = startMonth === month ? start.getDate() : 1;
+        const clipEndDay = endMonth === month ? end.getDate() : daysInMonth;
+
+        const startCellIndex = firstDay + (clipStartDay - 1);
+        const endCellIndex = firstDay + (clipEndDay - 1);
+        const startRow = Math.floor(startCellIndex / 7);
+        const endRow = Math.floor(endCellIndex / 7);
+        const startCol = startCellIndex % 7;
+        const endCol = endCellIndex % 7;
+
+        for (let r = startRow; r <= endRow; r++) {
+            const segStartCol = (r === startRow) ? startCol : 0;
+            const segEndCol = (r === endRow) ? endCol : 6;
+            if (!segmentsByRow[r]) segmentsByRow[r] = [];
+            segmentsByRow[r].push({ evt, row: r, startCol: segStartCol, endCol: segEndCol });
+        }
+    });
+
+    // Lane assignment per row (interval graph coloring), then render up to 2 lanes per day-cell constraint
+    Object.keys(segmentsByRow).forEach(rowKey => {
+        const r = parseInt(rowKey, 10);
+        const segs = segmentsByRow[r];
+        segs.sort((a, b) => (a.startCol - b.startCol) || ((b.endCol - b.startCol) - (a.endCol - a.startCol)));
+
+        const laneEnds = []; // laneEnds[lane] = last endCol used in that lane
+        segs.forEach(seg => {
+            let lane = 0;
+            while (lane < laneEnds.length && laneEnds[lane] >= seg.startCol) lane++;
+            if (lane === laneEnds.length) laneEnds.push(-1);
+            laneEnds[lane] = seg.endCol;
+            seg.lane = lane;
+        });
+
+        // Render segments in lane order, but enforce per-day max 2
+        segs.sort((a, b) => a.lane - b.lane);
+        segs.forEach(seg => {
+            // if this segment would require more than 2 bars in any covered day, skip it
+            for (let c = seg.startCol; c <= seg.endCol; c++) {
+                if (getCount(r, c) >= 2) return;
+            }
+
+            addEventBar(seg.evt, r + 1, seg.startCol + 1, seg.endCol + 2, seg.lane);
+            for (let c = seg.startCol; c <= seg.endCol; c++) incCount(r, c);
+        });
+    });
+
+    function addEventBar(evt, gridRow, colStart, colEnd, laneIndex) {
+        let barColor = getColorByDate(evt.date, evt.status, evt.end_date);
+        const evtDateTime = new Date(`${evt.date}T${evt.time}:00`);
+        const bar = document.createElement('div');
+        bar.className = 'calendar-event-bar';
+        bar.style.setProperty('--bar-row', gridRow);
+        bar.style.setProperty('--bar-start', colStart);
+        bar.style.setProperty('--bar-end', colEnd);
+        bar.style.setProperty('--bar-bottom', (BOTTOM_PADDING + laneIndex * (BAR_HEIGHT + BAR_GAP)) + 'px');
+        bar.style.backgroundColor = barColor;
+        if (evt.status === 'completed') bar.style.opacity = '0.6';
+        bar.textContent = evt.title;
+        calendarGrid.appendChild(bar);
     }
 }
 
@@ -493,10 +566,15 @@ function renderEventList() {
     today.setHours(0, 0, 0, 0);
 
     let filteredEvents = events.filter(e => {
-        const matchesSearch = e.title.toLowerCase().includes(term) || e.description.toLowerCase().includes(term);
+        const matchesSearch = e.title.toLowerCase().includes(term) || (e.description && e.description.toLowerCase().includes(term));
+        
+        // If there is a search term, ignore other filters
+        if (term) return matchesSearch;
+
         if (!matchesSearch) return false;
 
-        const evtDate = new Date(e.date + 'T00:00:00');
+        const start = new Date(e.date + 'T00:00:00');
+        const end = e.end_date ? new Date(e.end_date + 'T00:00:00') : start;
 
         // Handling filters correctly
         if (activeStatusFilter === 'completed') {
@@ -504,22 +582,25 @@ function renderEventList() {
         } else if (activeStatusFilter === 'cancelled') {
             return e.status === 'cancelled';
         } else {
-            // Default Upcoming filter: Hide finished or cancelled or passed days
-            if (evtDate < today || e.status === 'completed' || e.status === 'cancelled') return false;
+            // Default Upcoming filter: Hide finished or cancelled
+            if (e.status === 'completed' || e.status === 'cancelled') return false;
+            // Include if not yet passed (ongoing or future)
+            if (end < today) return false;
         }
 
         if (filterTime === 'selected-day' && selectedFilterDate) {
             return e.date === selectedFilterDate;
         } else if (filterTime === 'today') {
-            return evtDate.getTime() === today.getTime();
+            return today >= start && today <= end;
         } else if (filterTime === 'this-week') {
             const firstDay = new Date(today);
             firstDay.setDate(today.getDate() - today.getDay());
             const lastDay = new Date(firstDay);
             lastDay.setDate(firstDay.getDate() + 6);
-            return evtDate >= firstDay && evtDate <= lastDay;
+            return start <= lastDay && end >= firstDay;
         } else if (filterTime === 'this-month') {
-            return evtDate.getMonth() === today.getMonth() && evtDate.getFullYear() === today.getFullYear();
+            return (start.getMonth() === today.getMonth() && start.getFullYear() === today.getFullYear()) ||
+                   (end.getMonth() === today.getMonth() && end.getFullYear() === today.getFullYear());
         }
 
         return true;
@@ -533,19 +614,45 @@ function renderEventList() {
     filteredEvents.forEach(e => {
         const row = document.createElement('div');
         row.className = 'glass event-row';
-        row.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 25px 30px; border-radius: var(--border-radius-lg); transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); flex-shrink: 0;';
+        row.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 25px 30px 40px; border-radius: var(--border-radius-lg); transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); flex-shrink: 0; position: relative;';
 
         const dObj = new Date(`${e.date}T00:00:00`);
         const mNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
         const dayOfMonth = dObj.getDate();
         const monthStr = mNames[dObj.getMonth()];
+        const endObj = e.end_date ? new Date(`${e.end_date}T00:00:00`) : null;
+        const endDayOfMonth = endObj ? endObj.getDate() : null;
+        const endMonthStr = endObj ? mNames[endObj.getMonth()] : null;
 
-        const itemColor = getColorByDate(e.date, e.status);
+        const dateBadgeHtml = (() => {
+            if (!e.end_date || e.end_date === e.date || !endObj) {
+                return `
+                    <div style="font-size: 16px; font-weight: 800; line-height: 1;">${dayOfMonth}</div>
+                    <div style="font-size: 11px; text-transform: uppercase; font-weight: 800; opacity: 0.95; margin-top: 2px;">${monthStr}</div>
+                `;
+            }
+            if (endObj.getMonth() === dObj.getMonth() && endObj.getFullYear() === dObj.getFullYear()) {
+                // Same month: "13–19" then "Mar"
+                return `
+                    <div style="font-size: 16px; font-weight: 900; line-height: 1;">${dayOfMonth}–${endDayOfMonth}</div>
+                    <div style="font-size: 9px; text-transform: uppercase; font-weight: 900; opacity: 0.95; margin-top: 2px;">${monthStr}</div>
+                `;
+            }
+            // Different months: two lines "30 - Mar" then "1 - Apr"
+            return `
+                <div style="font-size: 12px; font-weight: 900; line-height: 1.1; white-space: nowrap;">${dayOfMonth} - ${monthStr}</div>
+                <div style="font-size: 12px; font-weight: 900; line-height: 1.1; white-space: nowrap; margin-top: 2px;">${endDayOfMonth} - ${endMonthStr}</div>
+            `;
+        })();
+
+        const itemColor = getColorByDate(e.date, e.status, e.end_date);
         let statusColorClass = 'status-green';
         if (itemColor === '#eab308') statusColorClass = 'status-yellow';
         if (itemColor === '#ef4444') statusColorClass = 'status-red';
         if (itemColor === '#3b82f6') {
-            statusColorClass = 'status-blue';
+            statusColorClass = 'status-blue'; // Ongoing
+        } else if (itemColor === '#64748b') {
+            statusColorClass = 'status-gray'; // Finished
         } else if (e.status === 'cancelled') {
             statusColorClass = ''; // No indicator for cancelled
         }
@@ -554,6 +661,12 @@ function renderEventList() {
         let statusLabel = 'Upcoming';
         let titleClass = '';
 
+        const todayDate = new Date();
+        todayDate.setHours(0, 0, 0, 0);
+        const evtStart = new Date(`${e.date}T00:00:00`);
+        const evtEnd = e.end_date ? new Date(`${e.end_date}T00:00:00`) : evtStart;
+        const isOngoing = todayDate >= evtStart && todayDate <= evtEnd && e.status === 'upcoming';
+
         if (e.status === 'completed') {
             pillClass = 'pill-completed';
             statusLabel = 'Finished';
@@ -561,19 +674,25 @@ function renderEventList() {
             pillClass = 'pill-cancelled';
             statusLabel = 'Cancelled';
             titleClass = 'event-title-cancelled';
+        } else if (isOngoing) {
+            pillClass = 'pill-ongoing';
+            statusLabel = 'Ongoing';
         }
+
+        // Days left counter
+        const daysUntil = getDaysUntil(todayDate, evtStart);
+        const daysLeftLabel = (isOngoing || daysUntil <= 0) ? 'Today' : `${daysUntil} day${daysUntil === 1 ? '' : 's'} left`;
 
         row.innerHTML = `
             <div class="status-line ${statusColorClass}"></div>
             <div class="status-pill ${pillClass}">${statusLabel}</div>
             <div style="display: flex; align-items: center; gap: 15px; flex: 1; pointer-events: none; min-width: 0;">
-                <div style="background: var(--primary-blue); color: white; border-radius: 8px; padding: 10px; text-align: center; min-width: 60px; flex-shrink: 0;">
-                    <div style="font-size: 16px; font-weight: 700; line-height: 1;">${dayOfMonth}</div>
-                    <div style="font-size: 10px; text-transform: uppercase; font-weight: 600; opacity: 0.9;">${monthStr}</div>
+                <div style="background: var(--primary-blue); color: white; border-radius: 8px; padding: 10px 10px; text-align: center; min-width: 78px; flex-shrink: 0;">
+                    ${dateBadgeHtml}
                 </div>
                 <div style="flex: 1; min-width: 0;">
-                    <h3 class="${titleClass}" style="font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;">${e.title}</h3>
-                    <div style="display: flex; gap: 10px; color: var(--text-muted); font-size: 11px; font-weight: 500;">
+                    <h3 class="${titleClass}" style="font-size: 17px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;">${e.title}</h3>
+                    <div style="display: flex; gap: 10px; color: var(--text-muted); font-size: 16px; font-weight: 500;">
                         <span style="display: flex; align-items: center; gap: 3px;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                             ${formatTimeToAmer(e.time)}
@@ -581,6 +700,7 @@ function renderEventList() {
                     </div>
                 </div>
             </div>
+            <div style="position: absolute; right: 16px; bottom: 10px; font-size: 16px; font-weight: 700; color: var(--text-main); opacity: 0.75;">${daysLeftLabel}</div>
         `;
 
         row.onclick = () => openViewModal(e.id);
@@ -760,9 +880,11 @@ function checkUpcomingReminders() {
         if (displayTitle.length > 30) displayTitle = displayTitle.substring(0, 30) + '...';
 
         text.innerHTML = `
-            <strong>Psst! You have an upcoming schedule:</strong>
-            <span class="reminder-title">${displayTitle}</span>
+            <strong>Heads up! You have an upcoming schedule:</strong>
+            <strong>${displayTitle}</strong>
             <span class="reminder-meta">${daysLeft} day${daysLeft > 1 ? 's' : ''} left • ${timeStr}</span>
+           
+            
         `;
         alert.classList.add('show');
 

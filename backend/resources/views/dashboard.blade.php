@@ -242,7 +242,8 @@
                     <div class="legend-item"><span class="legend-color red"></span> 3 days before the schedule</div>
                     <div class="legend-item"><span class="legend-color yellow"></span> 5 days before the schedule</div>
                     <div class="legend-item"><span class="legend-color green"></span> 1 week before the schedule</div>
-                    <div class="legend-item"><span class="legend-color blue"></span> Finished schedule</div>
+                    <div class="legend-item"><span class="legend-color blue"></span> Ongoing schedule</div>
+                    <div class="legend-item"><span class="legend-color gray"></span> Finished schedule</div>
                 </div>
 
                 <div class="sidebar-search-filters">
@@ -340,9 +341,9 @@
                 <div class="form-group" id="status-group" style="display: none;">
                     <label for="event-status">Update Status</label>
                     <select id="event-status">
-                        <option value="upcoming">🟡 Upcoming</option>
-                        <option value="completed">🟢 Completed</option>
-                        <option value="cancelled">🔴 Cancelled</option>
+                        <option value="upcoming">Upcoming</option>
+                        <option value="completed">Finished</option>
+                        <option value="cancelled">Cancelled</option>
                     </select>
                 </div>
                 
