@@ -1,0 +1,319 @@
+@import 'tailwindcss';:root {
+    --primary-blue: #2563eb;
+    --primary-blue-hover: #1c4ed9;
+    --secondary-blue: #3b82f6;
+    --light-blue: #bfdbfe;
+    --dark-bg: #f0f4f8;
+    --card-bg: #ffffff;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --accent: #1c4ed9;
+    /* Red for indicators */
+    --accent-hover: #1c4ed9;
+
+    --border-radius-lg: 16px;
+    --border-radius-md: 12px;
+    --box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.1), 0 4px 6px -2px rgba(37, 99, 235, 0.05);
+
+    --font-size-sm: 12px;
+    --font-size-base: 14px;
+    --font-size-lg: 16px;
+    --font-size-xl: 20px;
+    --font-size-xxl: 28px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Outfit', 'Inter', sans-serif;
+}
+
+body {
+    background-color: var(--dark-bg);
+    background-image: radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.08), transparent 25%),
+        radial-gradient(circle at 85% 30%, rgba(37, 99, 235, 0.08), transparent 25%);
+    color: var(--text-main);
+    font-size: var(--font-size-base);
+    height: 100vh;
+    overflow: hidden;
+    /* No full-page scroll */
+}
+
+/* Utilities */
+.glass {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: var(--box-shadow);
+}
+
+.btn {
+    background: var(--primary-blue);
+    color: white;
+    border: none;
+    padding: 16px 32px;
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    border-radius: var(--border-radius-md);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.39);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+
+.btn:hover {
+    background: var(--primary-blue-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.23);
+}
+
+.btn-accent {
+    background: var(--accent);
+    box-shadow: 0 4px 14px 0 rgba(71, 68, 239, 0.39);
+}
+
+.btn-accent:hover {
+    background: var(--accent-hover);
+    box-shadow: 0 6px 20px rgba(71, 68, 239, 0.39);
+}
+
+/* Form Styles */
+.form-group {
+    margin-bottom: 24px;
+    text-align: left;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: 600;
+    color: var(--text-main);
+    font-size: var(--font-size-base);
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 20px 24px;
+    font-size: var(--font-size-lg);
+    border: 2px solid #e2e8f0;
+    border-radius: var(--border-radius-md);
+    transition: all 0.3s ease;
+    background: #f8fafc;
+    color: var(--text-main);
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--primary-blue);
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+    background: white;
+}
+
+/* Login specific styles */
+.login-container {
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.login-card {
+    border-radius: var(--border-radius-lg);
+    padding: 50px;
+    width: 100%;
+    max-width: 560px;
+    text-align: center;
+}
+
+.login-card h1 {
+    font-size: var(--font-size-xxl);
+    color: var(--primary-blue);
+    font-weight: 700;
+    margin-bottom: 10px;
+    letter-spacing: -0.02em;
+}
+
+.login-card p {
+    color: var(--text-muted);
+    font-size: var(--font-size-base);
+    margin-bottom: 40px;
+}
+
+.login-card .btn {
+    width: 100%;
+    margin-top: 10px;
+}
+
+/* Scrollbar styling for containers */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(37, 99, 235, 0.2);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(37, 99, 235, 0.4);
+}
+
+/* Status Chips (Faceted Search) */
+.filter-chips {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.chip {
+    padding: 12px 20px;
+    border-radius: 100px;
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--card-bg);
+    border: 1px solid #e2e8f0;
+    color: var(--text-muted);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.chip:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+.chip.active {
+    background: var(--primary-blue);
+    color: white;
+    border-color: var(--primary-blue);
+}
+
+/* Status Dots for Event List */
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.status-upcoming {
+    background: #eab308;
+}
+
+/* Yellow */
+.status-completed {
+    background: #22c55e;
+}
+
+/* Green */
+.status-cancelled {
+    background: #ef4444;
+}
+
+/* Red */
+
+.event-title-cancelled {
+    text-decoration: line-through;
+    color: var(--text-muted) !important;
+}
+
+/* Badges for Modals */
+.status-badge {
+    padding: 8px 16px;
+    border-radius: 100px;
+    font-size: var(--font-size-base);
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.badge-upcoming {
+    background: #fef08a;
+    color: #854d0e;
+}
+
+.badge-completed {
+    background: #bbf7d0;
+    color: #166534;
+}
+
+.badge-cancelled {
+    background: #fecaca;
+    color: #991b1b;
+}
+
+/* Modal Button Layout (View Details) */
+.view-action-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 30px;
+}
+
+.divider {
+    height: 1px;
+    background: #e2e8f0;
+    margin: 10px 0;
+    width: 100%;
+}
+
+.btn-outline {
+    background: transparent;
+    color: var(--primary-blue);
+    border: 2px solid var(--primary-blue);
+    box-shadow: none;
+}
+
+.btn-outline:hover {
+    background: var(--primary-blue);
+    color: white;
+}
+
+.btn-danger {
+    background: #ef4444;
+    color: white;
+    box-shadow: 0 4px 14px 0 rgba(239, 68, 68, 0.39);
+    padding: 12px 24px;
+    font-size: var(--font-size-lg);
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+    box-shadow: 0 6px 20px rgba(239, 68, 68, 0.39);
+}
+
+.btn-subdued {
+    background: #f1f5f9;
+    color: var(--text-muted);
+    box-shadow: none;
+    font-size: var(--font-size-base);
+    padding: 12px 24px;
+    font-weight: 600;
+}
+
+.btn-subdued:hover {
+    background: #e2e8f0;
+    color: var(--text-main);
+    transform: none;
+    box-shadow: none;
+}
